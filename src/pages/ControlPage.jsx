@@ -184,28 +184,79 @@ const ControlPage = () => {
 
     const processCSV = (csvStr) => {
       if (!csvStr) return null;
-      const rows = csvStr.split(/\r?\n/);
-      const seen = new Set();
-      
-      const newRows = rows.map(row => {
-        const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-        const newCols = cols.map(col => {
-          let val = col.trim();
-          if (val.startsWith('"') && val.endsWith('"')) {
-            val = val.slice(1, -1).trim();
-          }
-          if (!val) return col; 
-          
-          if (seen.has(val)) {
-            return ''; // Remove exact duplicate
+      const lines = csvStr.split(/\r?\n/).filter(line => line.trim());
+      if (lines.length <= 1) return csvStr;
+
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              current += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
           } else {
-            seen.add(val);
-            return col;
+            current += char;
           }
-        });
-        return newCols.join(',');
-      });
-      return newRows.join('\n');
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]);
+      const rawRows = lines.slice(1).map(parseCSVLine);
+
+      const isIdHeader = (h) => {
+        if (!h) return false;
+        const s = h.trim().toLowerCase();
+        return ['id', 'sl', 'sl.', 'sl no', 'sl. no', 'sl. no.', 'no', 'no.', 'num', 'number', 'index', 'page', 'page no', 'page no.'].includes(s);
+      };
+
+      const hasIdColumn = isIdHeader(headers[0]) || (rawRows.length > 0 && rawRows.every(r => r.length > 1 && /^\d+$/.test(r[0])));
+
+      const seen = new Set();
+      const uniqueRows = [];
+
+      for (const row of rawRows) {
+        if (!row || row.every(cell => !cell || !cell.trim())) continue;
+        const contentCols = hasIdColumn ? row.slice(1) : row;
+        const contentKey = contentCols.map(c => (c || '').trim().toLowerCase()).join('|||');
+
+        if (seen.has(contentKey)) {
+          continue; // Skip duplicate row/card
+        }
+        seen.add(contentKey);
+
+        const newRow = [...row];
+        if (hasIdColumn) {
+          newRow[0] = String(uniqueRows.length + 1); // Renumber ID
+        }
+        uniqueRows.push(newRow);
+      }
+
+      const formatCSVCell = (val) => {
+        if (val === undefined || val === null) return '';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const outputLines = [
+        headers.map(formatCSVCell).join(','),
+        ...uniqueRows.map(row => row.map(formatCSVCell).join(','))
+      ];
+
+      return outputLines.join('\n');
     };
 
     const newCsvContent = csvContent !== null ? processCSV(csvContent) : (editId ? savedItems.find(i => i.id === editId)?.csvContent || null : null);
