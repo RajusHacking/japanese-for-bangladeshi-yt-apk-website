@@ -3,7 +3,14 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { db } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
+import { useLanguage } from '../context/LanguageContext';
+
+const NOT_FOUND_TEXT = {
+  bn: 'এই ভিডিওতে রিসোর্স নেই',
+  en: 'This video has no resource',
+  ja: 'この動画にはリソースがありません',
+};
 
 const PreviewPage = () => {
   const { id } = useParams();
@@ -11,42 +18,66 @@ const PreviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [parsedCsv, setParsedCsv] = useState({ headers: [], rows: [] });
   const [copiedStates, setCopiedStates] = useState({});
+  const { language } = useLanguage();
 
   useEffect(() => {
     const fetchPreview = async () => {
-      // 1. Check local storage first
       const cacheKey = `j4b_public_cache_${id}`;
       const cachedData = localStorage.getItem(cacheKey);
-      
-      if (cachedData) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          setEpisodeData(parsed);
-          if (parsed.csvContent) {
-            parseCSV(parsed.csvContent);
-          }
-          setLoading(false);
-          return; // Exit early if we have cached data
-        } catch (e) {
-          console.error("Failed to parse cached data", e);
-        }
-      }
 
-      // 2. If not in cache, fetch from Firestore
       try {
-        const q = query(collection(db, "episodes"), where("detectedLink", "==", `/${id}`));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const match = querySnapshot.docs[0].data();
-          setEpisodeData(match);
-          if (match.csvContent) {
-            parseCSV(match.csvContent);
+        // 1. Always verify from Firestore first
+        const querySnapshot = await getDocs(collection(db, "episodes"));
+        let match = null;
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (
+            data.detectedLink === `/${id}` ||
+            data.detectedLink === `https://j4b.vercel.app/${id}`
+          ) {
+            match = data;
           }
-          // 3. Save to local storage for next time
-          localStorage.setItem(cacheKey, JSON.stringify(match));
+        });
+
+        if (match) {
+          // 2. Item exists in DB — use cached data if available (faster), otherwise use DB data
+          if (cachedData) {
+            try {
+              const parsed = JSON.parse(cachedData);
+              // Update cache with latest DB data
+              localStorage.setItem(cacheKey, JSON.stringify(match));
+              setEpisodeData(match);
+              if (match.csvContent) {
+                parseCSV(match.csvContent);
+              }
+            } catch (e) {
+              setEpisodeData(match);
+              if (match.csvContent) parseCSV(match.csvContent);
+            }
+          } else {
+            setEpisodeData(match);
+            if (match.csvContent) parseCSV(match.csvContent);
+            localStorage.setItem(cacheKey, JSON.stringify(match));
+          }
+        } else {
+          // 3. Item NOT in DB — clear old cache and show not found
+          if (cachedData) {
+            localStorage.removeItem(cacheKey);
+          }
+          setEpisodeData(null);
         }
       } catch (e) {
         console.error("Failed to load data from Firebase", e);
+        // If network fails, fallback to cache
+        if (cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData);
+            setEpisodeData(parsed);
+            if (parsed.csvContent) parseCSV(parsed.csvContent);
+          } catch (parseErr) {
+            console.error("Failed to parse cached data", parseErr);
+          }
+        }
       } finally {
         setLoading(false);
       }
@@ -85,13 +116,9 @@ const PreviewPage = () => {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh] px-4 text-center">
         <AlertCircle size={48} className="text-gray-400 mb-4" />
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Item Not Found</h1>
-        <p className="text-gray-500 dark:text-gray-400 mb-6">
-          We couldn't find the data for this item. It may have been removed.
+        <p className="text-lg font-medium text-gray-600 dark:text-gray-300">
+          {NOT_FOUND_TEXT[language] || NOT_FOUND_TEXT.en}
         </p>
-        <Link to="/control" className="px-6 py-2.5 bg-brand text-white font-medium rounded-xl hover:opacity-90 transition-opacity">
-          Return to Control Panel
-        </Link>
       </div>
     );
   }

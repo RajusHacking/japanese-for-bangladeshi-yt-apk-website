@@ -6,7 +6,7 @@ import { db, auth } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const ALLOWED_UIDS = ['nCwPYIH14zY3CPALYq6OmRWcOJX2', 'ee8dlkU8ZcN4jjHI79uU6IKYxE62'];
+const ALLOWED_EMAILS = ['work.alirejaraju@gmail.com', 'info.alirejaraju@gmail.com'];
 
 const ControlPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,7 +59,7 @@ const ControlPage = () => {
     }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && ALLOWED_UIDS.includes(user.uid)) {
+      if (user && user.email && ALLOWED_EMAILS.includes(user.email.toLowerCase())) {
         setIsAuthenticated(true);
       } else if (!savedAuth) {
         // Not authenticated or not an allowed UID — redirect to login
@@ -84,6 +84,9 @@ const ControlPage = () => {
 
   // Auto-detect link logic by fetching YouTube data via API
   useEffect(() => {
+    let timeoutId;
+    let intervalId;
+
     const fetchYoutubeDescription = async () => {
       if (!videoInput) {
         setYoutubeId('');
@@ -113,10 +116,11 @@ const ControlPage = () => {
           if (data.items && data.items.length > 0) {
             const description = data.items[0].snippet.description;
             setVideoTitle(data.items[0].snippet.title);
-            // Detect link like https://j4b.vercel.app/628468348
-            const linkMatch = description.match(/https?:\/\/j4b\.vercel\.app\/([a-zA-Z0-9-]+)/i);
-            if (linkMatch && linkMatch[1]) {
-              setDetectedLink('/' + linkMatch[1]);
+            // Detect link like https://j4b.vercel.app/Episode-10
+            const linkMatch = description.match(/https?:\/\/j4b\.vercel\.app\/[a-zA-Z0-9-]+/i);
+            if (linkMatch && linkMatch[0]) {
+              setDetectedLink(linkMatch[0]);
+              clearInterval(intervalId); // Stop polling once found
             } else {
               setDetectedLink(''); // Reset if no link found in new video
             }
@@ -128,8 +132,21 @@ const ControlPage = () => {
       }
     };
 
-    const timeoutId = setTimeout(fetchYoutubeDescription, 800); // Debounce
-    return () => clearTimeout(timeoutId);
+    if (videoInput) {
+      timeoutId = setTimeout(() => {
+        fetchYoutubeDescription();
+        intervalId = setInterval(fetchYoutubeDescription, 3000); // Recheck every 3 seconds
+      }, 800);
+    } else {
+      setDetectedLink('');
+      setYoutubeId('');
+      setVideoTitle('');
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
   }, [videoInput]);
 
   const handleFileChange = (e) => {
@@ -161,8 +178,44 @@ const ControlPage = () => {
       return;
     }
     if (!detectedLink) {
-      alert("Detected link is empty. Please provide one (e.g. /628468348)");
+      alert("Resource link is empty. Please provide one (e.g. https://j4b.vercel.app/Episode-10)");
       return;
+    }
+
+    const processCSV = (csvStr) => {
+      if (!csvStr) return null;
+      const rows = csvStr.split(/\r?\n/);
+      const seen = new Set();
+      
+      const newRows = rows.map(row => {
+        const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+        const newCols = cols.map(col => {
+          let val = col.trim();
+          if (val.startsWith('"') && val.endsWith('"')) {
+            val = val.slice(1, -1).trim();
+          }
+          if (!val) return col; 
+          
+          if (seen.has(val)) {
+            return ''; // Remove exact duplicate
+          } else {
+            seen.add(val);
+            return col;
+          }
+        });
+        return newCols.join(',');
+      });
+      return newRows.join('\n');
+    };
+
+    const newCsvContent = csvContent !== null ? processCSV(csvContent) : (editId ? savedItems.find(i => i.id === editId)?.csvContent || null : null);
+    
+    let newCsvName = csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName || null : null);
+    if (newCsvContent && detectedLink) {
+      const match = detectedLink.match(/https?:\/\/j4b\.vercel\.app\/([a-zA-Z0-9-]+)/i);
+      if (match && match[1]) {
+        newCsvName = `${match[1]}.csv`;
+      }
     }
 
     const newItem = {
@@ -171,8 +224,8 @@ const ControlPage = () => {
       detectedLink,
       youtubeId,
       videoTitle,
-      csvFileName: csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName || null : null),
-      csvContent: csvContent !== null ? csvContent : (editId ? savedItems.find(i => i.id === editId)?.csvContent || null : null),
+      csvFileName: newCsvName,
+      csvContent: newCsvContent,
       timestamp: Date.now()
     };
 
@@ -269,7 +322,7 @@ const ControlPage = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         
         {/* Left Column: Control Panel Form */}
         <motion.div 
@@ -293,7 +346,7 @@ const ControlPage = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <LinkIcon size={16} /> Auto Detected Link
+                <LinkIcon size={16} /> Resource Link
               </span>
               {isDetecting && (
                 <span className="text-xs text-brand flex items-center gap-1">
@@ -304,7 +357,7 @@ const ControlPage = () => {
             </label>
             <input 
               type="text"
-              placeholder="e.g. /628468348"
+              placeholder="e.g. https://j4b.vercel.app/Episode-10"
               value={detectedLink}
               onChange={(e) => setDetectedLink(e.target.value)}
               className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand dark:text-white"
@@ -394,9 +447,6 @@ const ControlPage = () => {
                       <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                         {item.videoTitle || 'YouTube Video'}
                       </h3>
-                      <a href={item.videoInput} target="_blank" rel="noopener noreferrer" className="text-sm text-brand hover:underline truncate block">
-                        {item.videoInput}
-                      </a>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="px-2 py-1 bg-brand/10 text-brand text-xs rounded font-medium">
                           {item.detectedLink || 'No link detected'}
@@ -457,25 +507,6 @@ const ControlPage = () => {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right Column: Preview */}
-        <div className="bg-black border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm aspect-video flex flex-col items-center justify-center relative">
-          {youtubeId ? (
-            <iframe 
-              src={`https://www.youtube.com/embed/${youtubeId}`} 
-              title="YouTube video player" 
-              frameBorder="0" 
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-              allowFullScreen
-              className="absolute inset-0 w-full h-full"
-            ></iframe>
-          ) : (
-            <div className="flex flex-col items-center text-gray-500 p-6 text-center gap-3">
-              <Video size={48} className="opacity-50" />
-              <p className="text-sm font-medium">Paste a valid YouTube link to see preview</p>
-            </div>
-          )}
         </div>
 
       </div>

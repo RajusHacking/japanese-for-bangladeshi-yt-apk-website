@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { auth, googleProvider } from '../firebase';
 import { signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 
-const ALLOWED_UIDS = ['nCwPYIH14zY3CPALYq6OmRWcOJX2', 'ee8dlkU8ZcN4jjHI79uU6IKYxE62'];
+const ALLOWED_EMAILS = ['work.alirejaraju@gmail.com', 'info.alirejaraju@gmail.com'];
 
 const LoginPage = () => {
   const [error, setError] = useState('');
@@ -18,12 +18,12 @@ const LoginPage = () => {
       return;
     }
 
-    // 1. Check if returning from a Google redirect
+    // 1. Check if returning from a Google redirect (if fallback was used)
     getRedirectResult(auth)
       .then(async (result) => {
         if (result && result.user) {
-          const uid = result.user.uid;
-          if (ALLOWED_UIDS.includes(uid)) {
+          const email = result.user.email?.toLowerCase();
+          if (ALLOWED_EMAILS.includes(email)) {
             localStorage.setItem('j4b_admin_auth', JSON.stringify({
               uid: result.user.uid,
               email: result.user.email,
@@ -33,7 +33,7 @@ const LoginPage = () => {
             navigate('/control', { replace: true });
           } else {
             await auth.signOut();
-            setError('Unauthorized: You do not have admin access.');
+            setError('Unauthorized: Your email does not have admin access.');
           }
         }
       })
@@ -42,10 +42,11 @@ const LoginPage = () => {
         setError('Failed to sign in with Google: ' + err.message);
       });
 
-    // 2. Listen to normal Auth state
+    // 2. Listen to normal Auth state (catches both popup and persistent state)
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        if (ALLOWED_UIDS.includes(user.uid)) {
+        const email = user.email?.toLowerCase();
+        if (ALLOWED_EMAILS.includes(email)) {
           // Valid admin user
           localStorage.setItem('j4b_admin_auth', JSON.stringify({
             uid: user.uid,
@@ -57,7 +58,7 @@ const LoginPage = () => {
         } else {
           // Logged in but not admin
           await auth.signOut();
-          setError('Unauthorized: You do not have admin access.');
+          setError('Unauthorized: Your email does not have admin access.');
           setChecking(false);
         }
       } else {
@@ -68,14 +69,27 @@ const LoginPage = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setChecking(true);
-    // Use redirect instead of popup, which fixes the mobile browser issue
-    signInWithRedirect(auth, googleProvider).catch((err) => {
+    setError('');
+    try {
+      // Try popup first (works best on PC)
+      import('firebase/auth').then(({ signInWithPopup }) => {
+        signInWithPopup(auth, googleProvider).catch((err) => {
+          // If popup is blocked (common on mobile), fallback to redirect
+          if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+            signInWithRedirect(auth, googleProvider);
+          } else {
+            console.error(err);
+            setError('Failed to sign in: ' + err.message);
+            setChecking(false);
+          }
+        });
+      });
+    } catch (err) {
       console.error(err);
-      setError('Failed to initialize Google Sign-In');
       setChecking(false);
-    });
+    }
   };
 
   if (checking) {
