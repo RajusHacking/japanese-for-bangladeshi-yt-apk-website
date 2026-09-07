@@ -3,13 +3,20 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../context/LanguageContext';
 
 const NOT_FOUND_TEXT = {
   bn: 'এই ভিডিওতে রিসোর্স নেই',
   en: 'This video has no resource',
   ja: 'この動画にはリソースがありません',
+};
+
+const getSlug = (link) => {
+  if (!link) return '';
+  const clean = String(link).split('?')[0].split('#')[0].trim().replace(/\/+$/, '');
+  const parts = clean.split('/');
+  return parts[parts.length - 1].toLowerCase();
 };
 
 const PreviewPage = () => {
@@ -21,68 +28,61 @@ const PreviewPage = () => {
   const { language } = useLanguage();
 
   useEffect(() => {
-    const fetchPreview = async () => {
-      const cacheKey = `j4b_public_cache_${id}`;
-      const cachedData = localStorage.getItem(cacheKey);
+    // 1. Purge any lingering legacy local storage caches
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('j4b_public_cache_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (err) {
+      // ignore
+    }
 
-      try {
-        // 1. Always verify from Firestore first
-        const querySnapshot = await getDocs(collection(db, "episodes"));
-        let match = null;
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          if (
-            data.detectedLink === `/${id}` ||
-            data.detectedLink === `https://j4b.vercel.app/${id}`
-          ) {
-            match = data;
-          }
-        });
+    setLoading(true);
+    const targetSlug = getSlug(id);
 
-        if (match) {
-          // 2. Item exists in DB — use cached data if available (faster), otherwise use DB data
-          if (cachedData) {
-            try {
-              const parsed = JSON.parse(cachedData);
-              // Update cache with latest DB data
-              localStorage.setItem(cacheKey, JSON.stringify(match));
-              setEpisodeData(match);
-              if (match.csvContent) {
-                parseCSV(match.csvContent);
-              }
-            } catch (e) {
-              setEpisodeData(match);
-              if (match.csvContent) parseCSV(match.csvContent);
-            }
-          } else {
-            setEpisodeData(match);
-            if (match.csvContent) parseCSV(match.csvContent);
-            localStorage.setItem(cacheKey, JSON.stringify(match));
-          }
+    // 2. Real-time subscription to Firestore episodes collection
+    const unsubscribe = onSnapshot(collection(db, "episodes"), (querySnapshot) => {
+      const matchedItems = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const docSlug = getSlug(data.detectedLink);
+        const docId = String(data.id || '').trim().toLowerCase();
+
+        if (
+          (docSlug && docSlug === targetSlug) ||
+          (docId && docId === targetSlug) ||
+          (data.detectedLink && data.detectedLink.toLowerCase().includes(targetSlug))
+        ) {
+          matchedItems.push(data);
+        }
+      });
+
+      // Sort by newest timestamp first
+      matchedItems.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      const match = matchedItems.length > 0 ? matchedItems[0] : null;
+
+      if (match) {
+        setEpisodeData(match);
+        if (match.csvContent) {
+          parseCSV(match.csvContent);
         } else {
-          // 3. Item NOT in DB — clear old cache and show not found
-          if (cachedData) {
-            localStorage.removeItem(cacheKey);
-          }
-          setEpisodeData(null);
+          setParsedCsv({ headers: [], rows: [] });
         }
-      } catch (e) {
-        console.error("Failed to load data from Firebase", e);
-        // If network fails, fallback to cache
-        if (cachedData) {
-          try {
-            const parsed = JSON.parse(cachedData);
-            setEpisodeData(parsed);
-            if (parsed.csvContent) parseCSV(parsed.csvContent);
-          } catch (parseErr) {
-            console.error("Failed to parse cached data", parseErr);
-          }
-        }
-      } finally {
-        setLoading(false);
+      } else {
+        setEpisodeData(null);
+        setParsedCsv({ headers: [], rows: [] });
       }
-    };
-    fetchPreview();
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore onSnapshot error:", error);
+      setEpisodeData(null);
+      setParsedCsv({ headers: [], rows: [] });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [id]);
 
   const parseCSV = (csvText) => {

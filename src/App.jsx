@@ -20,7 +20,6 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/control" element={<ControlPage />} />
-              <Route path="/episode-:id" element={<EpisodePage />} />
               <Route path="/:id" element={<PreviewPage />} />
             </Routes>
           </Layout>
