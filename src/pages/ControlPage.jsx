@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Video, FileText, Check, Trash2, Edit2, Upload, AlertCircle, Save, XCircle, Link as LinkIcon, Eye, LogOut } from 'lucide-react';
+import { ArrowRight, Video, FileText, Check, Trash2, Edit2, Upload, AlertCircle, Save, XCircle, Link as LinkIcon, Eye, LogOut, FileCode } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -18,9 +18,12 @@ const ControlPage = () => {
   const [detectedLink, setDetectedLink] = useState('');
   const [csvFile, setCsvFile] = useState(null);
   const [csvContent, setCsvContent] = useState(null);
+  const [jsonFile, setJsonFile] = useState(null);
+  const [jsonContent, setJsonContent] = useState(null);
   const [editId, setEditId] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const fileInputRef = useRef(null);
+  const jsonFileInputRef = useRef(null);
 
   // Computed YouTube ID and Title for preview
   const [youtubeId, setYoutubeId] = useState('');
@@ -162,15 +165,40 @@ const ControlPage = () => {
     }
   };
 
+  const handleJsonFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setJsonFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          JSON.parse(event.target.result);
+          setJsonContent(event.target.result);
+        } catch (err) {
+          alert("Invalid JSON format! Please upload a valid JSON file.");
+          setJsonFile(null);
+          setJsonContent(null);
+          if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const handleClear = () => {
     setVideoInput('');
     setDetectedLink('');
     setVideoTitle('');
     setCsvFile(null);
     setCsvContent(null);
+    setJsonFile(null);
+    setJsonContent(null);
     setEditId(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (jsonFileInputRef.current) {
+      jsonFileInputRef.current.value = '';
     }
   };
 
@@ -273,6 +301,15 @@ const ControlPage = () => {
       }
     }
 
+    const newJsonContent = jsonContent !== null ? jsonContent : (editId ? savedItems.find(i => i.id === editId)?.jsonContent || null : null);
+    let newJsonName = jsonFile ? jsonFile.name : (editId ? savedItems.find(i => i.id === editId)?.jsonFileName || null : null);
+    if (newJsonContent && detectedLink) {
+      const match = detectedLink.match(/https?:\/\/j4b\.vercel\.app\/([a-zA-Z0-9-]+)/i);
+      if (match && match[1]) {
+        newJsonName = `${match[1]}.json`;
+      }
+    }
+
     const newItem = {
       id: editId || Date.now().toString(),
       videoInput,
@@ -281,6 +318,8 @@ const ControlPage = () => {
       videoTitle,
       csvFileName: newCsvName,
       csvContent: newCsvContent,
+      jsonFileName: newJsonName,
+      jsonContent: newJsonContent,
       timestamp: Date.now()
     };
 
@@ -303,6 +342,10 @@ const ControlPage = () => {
     setVideoInput(item.videoInput || '');
     setDetectedLink(item.detectedLink || '');
     setVideoTitle(item.videoTitle || '');
+    setCsvContent(item.csvContent || null);
+    setCsvFile(null);
+    setJsonContent(item.jsonContent || null);
+    setJsonFile(null);
     setEditId(item.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -366,6 +409,7 @@ const ControlPage = () => {
   }
 
   const currentCsvName = csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName : null);
+  const currentJsonName = jsonFile ? jsonFile.name : (editId ? (savedItems.find(i => i.id === editId)?.jsonFileName || (savedItems.find(i => i.id === editId)?.jsonContent ? 'Quiz.json' : null)) : null);
 
   return (
     <div className="w-full flex-1 p-4 md:p-6 lg:p-8">
@@ -424,7 +468,7 @@ const ControlPage = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <Upload size={16} /> CSV File Upload
+                <Upload size={16} /> Vocabulary CSV File Upload
               </span>
               {currentCsvName && (
                 <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
@@ -460,11 +504,11 @@ const ControlPage = () => {
                   <span className={`text-sm truncate font-medium ${
                     currentCsvName ? 'text-emerald-900 dark:text-emerald-100 font-semibold' : 'text-gray-500'
                   }`}>
-                    {currentCsvName || 'Choose a .csv file'}
+                    {currentCsvName || 'Choose a .csv vocabulary file'}
                   </span>
                   {currentCsvName && (
                     <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
-                      Click to choose a different file
+                      Click to choose a different CSV file
                     </span>
                   )}
                 </div>
@@ -480,8 +524,77 @@ const ControlPage = () => {
                     setCsvContent(null);
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
-                  className="p-1.5 text-emerald-600 hover:text-red-500 dark:text-emerald-400 dark:hover:text-red-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors ml-2 shrink-0"
+                  className="p-1.5 text-emerald-600 hover:text-red-500 dark:text-emerald-400 dark:hover:text-red-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors ml-2 shrink-0 cursor-pointer"
                   title="Remove CSV file"
+                >
+                  <XCircle size={18} />
+                </button>
+              )}
+            </label>
+          </div>
+
+          {/* Quiz JSON File Upload */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <FileCode size={16} /> Quiz JSON File Upload
+              </span>
+              {currentJsonName && (
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                  <Check size={12} strokeWidth={3} /> Selected
+                </span>
+              )}
+            </label>
+            <label 
+              className={`w-full flex items-center justify-between px-4 py-3 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                currentJsonName 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
+                  : 'border-dashed border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5 bg-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <input 
+                  ref={jsonFileInputRef}
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleJsonFileChange} 
+                  className="hidden" 
+                />
+                {currentJsonName ? (
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Check size={18} strokeWidth={2.5} />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-400 flex items-center justify-center shrink-0">
+                    <FileCode size={18} />
+                  </div>
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-sm truncate font-medium ${
+                    currentJsonName ? 'text-emerald-900 dark:text-emerald-100 font-semibold' : 'text-gray-500'
+                  }`}>
+                    {currentJsonName || 'Choose a .json quiz file'}
+                  </span>
+                  {currentJsonName && (
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                      Click to choose a different JSON file
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {currentJsonName && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setJsonFile(null);
+                    setJsonContent(null);
+                    if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
+                  }}
+                  className="p-1.5 text-emerald-600 hover:text-red-500 dark:text-emerald-400 dark:hover:text-red-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors ml-2 shrink-0 cursor-pointer"
+                  title="Remove JSON file"
                 >
                   <XCircle size={18} />
                 </button>
@@ -597,6 +710,16 @@ const ControlPage = () => {
                   ) : (
                     <span className="flex items-center gap-1 text-xs text-orange-500">
                       <AlertCircle size={12} /> No CSV
+                    </span>
+                  )}
+                  {item.jsonFileName || item.jsonContent ? (
+                    <span className="flex items-center gap-1 bg-gray-100 dark:bg-black px-2 py-0.5 rounded text-xs text-emerald-600 dark:text-emerald-400">
+                      <FileCode size={12} className="text-emerald-500" /> 
+                      {item.jsonFileName || 'Quiz JSON'}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <AlertCircle size={12} /> No Quiz
                     </span>
                   )}
                   {item.youtubeId && (
