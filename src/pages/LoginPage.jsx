@@ -12,6 +12,12 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const savedAuth = localStorage.getItem('j4b_admin_auth');
+    if (savedAuth) {
+      navigate('/control', { replace: true });
+      return;
+    }
+
     // 1. Check if returning from a Google redirect
     getRedirectResult(auth)
       .then(async (result) => {
@@ -37,7 +43,6 @@ const LoginPage = () => {
       });
 
     // 2. Listen to normal Auth state
-    const savedAuth = localStorage.getItem('j4b_admin_auth');
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         if (ALLOWED_UIDS.includes(user.uid)) {
@@ -56,9 +61,6 @@ const LoginPage = () => {
           setChecking(false);
         }
       } else {
-        if (savedAuth) {
-          localStorage.removeItem('j4b_admin_auth');
-        }
         setChecking(false);
       }
     });

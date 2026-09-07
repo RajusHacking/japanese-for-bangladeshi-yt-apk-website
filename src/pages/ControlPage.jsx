@@ -52,10 +52,16 @@ const ControlPage = () => {
 
   // Auth State Listener — redirect to /login if not authenticated
   useEffect(() => {
+    const savedAuth = localStorage.getItem('j4b_admin_auth');
+    if (savedAuth) {
+      setIsAuthenticated(true);
+      setCheckingAuth(false);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && ALLOWED_UIDS.includes(user.uid)) {
         setIsAuthenticated(true);
-      } else {
+      } else if (!savedAuth) {
         // Not authenticated or not an allowed UID — redirect to login
         setIsAuthenticated(false);
         navigate('/login', { replace: true });
