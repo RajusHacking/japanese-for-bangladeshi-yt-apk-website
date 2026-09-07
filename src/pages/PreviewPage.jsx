@@ -24,7 +24,7 @@ const PreviewPage = () => {
   const { id } = useParams();
   const [episodeData, setEpisodeData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [parsedCsv, setParsedCsv] = useState({ headers: [], rows: [] });
+  const [parsedCsv, setParsedCsv] = useState({ headers: [], rows: [], orderedColIndices: [] });
   const [copiedStates, setCopiedStates] = useState({});
   const { language } = useLanguage();
 
@@ -69,17 +69,17 @@ const PreviewPage = () => {
         if (match.csvContent) {
           parseCSV(match.csvContent);
         } else {
-          setParsedCsv({ headers: [], rows: [] });
+          setParsedCsv({ headers: [], rows: [], orderedColIndices: [] });
         }
       } else {
         setEpisodeData(null);
-        setParsedCsv({ headers: [], rows: [] });
+        setParsedCsv({ headers: [], rows: [], orderedColIndices: [] });
       }
       setLoading(false);
     }, (error) => {
       console.error("Firestore onSnapshot error:", error);
       setEpisodeData(null);
-      setParsedCsv({ headers: [], rows: [] });
+      setParsedCsv({ headers: [], rows: [], orderedColIndices: [] });
       setLoading(false);
     });
 
@@ -146,7 +146,43 @@ const PreviewPage = () => {
       uniqueRows.push(newRow);
     }
 
-    setParsedCsv({ headers, rows: uniqueRows });
+    // Determine ordered column indices:
+    // 1st: Means / Ba (Bengali meaning)
+    // 2nd: Japanese (Japanese text)
+    // 3rd: Pronounce / Latin / Romaji
+    const contentIndices = [];
+    const startIndex = hasIdColumn ? 1 : 0;
+    for (let i = startIndex; i < headers.length; i++) {
+      contentIndices.push(i);
+    }
+
+    const getColRank = (colIdx) => {
+      const h = (headers[colIdx] || '').trim().toLowerCase();
+      if (['means', 'meaning', 'meanings', 'ba', 'bangla', 'bengali', 'bn', 'artho', 'অর্থ', 'মানে'].includes(h)) return 1;
+      if (['japanese', 'japan', 'ja', 'jp', 'kanji', 'kana', 'nihongo', 'sentence'].includes(h)) return 2;
+      if (['pronounce', 'pronunciation', 'pronounce/latin', 'latin', 'romaji', 'reading', 'sound', 'uchharon', 'উচ্চারণ'].includes(h)) return 3;
+
+      // Detect by sample character content
+      let bnCount = 0;
+      let jaCount = 0;
+      let latCount = 0;
+      for (let r = 0; r < Math.min(uniqueRows.length, 10); r++) {
+        const val = uniqueRows[r]?.[colIdx] || '';
+        if (/[\u0980-\u09FF]/.test(val)) bnCount++;
+        if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(val)) jaCount++;
+        if (/[a-zA-Z]/.test(val) && !/[\u0980-\u09FF]/.test(val) && !/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(val)) latCount++;
+      }
+
+      if (bnCount > 0 && bnCount >= jaCount) return 1;
+      if (jaCount > 0) return 2;
+      if (latCount > 0) return 3;
+
+      return 4 + colIdx;
+    };
+
+    contentIndices.sort((a, b) => getColRank(a) - getColRank(b));
+
+    setParsedCsv({ headers, rows: uniqueRows, orderedColIndices: contentIndices });
   };
 
   const handleCopy = (text, key) => {
@@ -216,14 +252,9 @@ const PreviewPage = () => {
                     </span>
                   </div>
                   
-                  {/* Card Values (No Labels) */}
+                  {/* Card Values (Ordered: 1st Means/Ba, 2nd Japanese, 3rd Pronounce) */}
                   <div className="flex flex-col pb-1">
-                    {parsedCsv.headers.map((header, cellIndex) => {
-                      const h = (header || '').trim().toLowerCase();
-                      if (cellIndex === 0 && ['id', 'sl', 'sl.', 'no', 'num', 'index', 'page'].includes(h)) {
-                        return null;
-                      }
-
+                    {(parsedCsv.orderedColIndices || []).map((cellIndex) => {
                       const value = row[cellIndex] || '';
                       if (!value) return null;
                       const copyKey = `${rowIndex}-${cellIndex}`;
@@ -242,7 +273,7 @@ const PreviewPage = () => {
                           
                           <button
                             onClick={() => handleCopy(value, copyKey)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-white/10 dark:text-gray-400 dark:hover:bg-white/20 dark:hover:text-white transition-colors shrink-0"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-white/10 dark:text-gray-400 dark:hover:bg-white/20 dark:hover:text-white transition-colors shrink-0 cursor-pointer"
                             title="Copy to clipboard"
                           >
                             {isCopied ? <Check size={15} className="text-green-500" /> : <Copy size={15} />}

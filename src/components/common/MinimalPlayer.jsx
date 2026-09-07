@@ -19,13 +19,34 @@ const MinimalPlayer = ({ youtubeId, title = 'Video Player' }) => {
 
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [actionFeedback, setActionFeedback] = useState(null); // 'play' | 'pause'
+
+  // Unmute on first user interaction if browser autoplay policy initially prevented sound
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      if (playerRef.current && playerRef.current.unMute) {
+        try {
+          playerRef.current.unMute();
+          playerRef.current.setVolume(100);
+          setIsMuted(false);
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('click', handleFirstInteraction, { once: true });
+    window.addEventListener('touchstart', handleFirstInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+    };
+  }, []);
 
   // Initialize YouTube Iframe API
   useEffect(() => {
@@ -46,7 +67,7 @@ const MinimalPlayer = ({ youtubeId, title = 'Video Player' }) => {
         videoId: youtubeId,
         playerVars: {
           autoplay: 1,
-          mute: 1, // CRITICAL: Required for mobile browsers to allow autoplay
+          mute: 0, // Default Unmuted as requested
           controls: 0,
           modestbranding: 1,
           rel: 0,
@@ -66,9 +87,11 @@ const MinimalPlayer = ({ youtubeId, title = 'Video Player' }) => {
             if (destroyed) return;
             const player = event.target;
             try {
-              player.mute();
+              // Default unmuted at 100% volume
+              player.unMute();
+              player.setVolume(100);
+              setIsMuted(false);
               player.playVideo();
-              setIsMuted(true);
 
               // Set playsinline on iframe directly for iOS Safari / WebKit
               if (player.getIframe) {
