@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-brand: var(--brand-color);
+}
+
+:root {
+  --brand-color: #f97316;
+}
+
+html.dark {
+  --brand-color: #f97316;
+}
+
+/* Global low-opacity Slate/Zinc borders */
+[class*="border-gray-"],
+[class*="border-white/"],
+[class*="border-black/"] {
+  border-color: rgba(113, 113, 122, 0.15) !important;
+}
+
+html.dark [class*="border-gray-"],
+html.dark [class*="border-white/"],
+html.dark [class*="border-black/"] {
+  border-color: rgba(161, 161, 170, 0.15) !important;
+}
+
+/* Global Scrollbar Hiding (Applies to all elements) */
+html, body, * {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
+/* Utilities for hiding scrollbar visually but keeping functionality */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+body:not(.app-loaded) .stagger-animate > * {
+  opacity: 0;
+  animation: fadeInDown 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+body:not(.app-loaded) .stagger-animate > *:nth-child(1) { animation-delay: 100ms; }
+body:not(.app-loaded) .stagger-animate > *:nth-child(2) { animation-delay: 200ms; }
+body:not(.app-loaded) .stagger-animate > *:nth-child(3) { animation-delay: 300ms; }
+body:not(.app-loaded) .stagger-animate > *:nth-child(4) { animation-delay: 400ms; }
+body:not(.app-loaded) .stagger-animate > *:nth-child(5) { animation-delay: 500ms; }
+body:not(.app-loaded) .stagger-animate > *:nth-child(n+6) { animation-delay: 600ms; }
+
+/* Ambient Scheme Color Soft Gradients - Ultra soft, faintly discernible */
+.ambient-gradient-glow {
+  background: radial-gradient(
+    ellipse 120% 70% at 50% 30%,
+    color-mix(in srgb, var(--brand-color) 20%, transparent) 0%,
+    color-mix(in srgb, var(--brand-color) 10%, transparent) 40%,
+    color-mix(in srgb, var(--brand-color) 2%, transparent) 70%,
+    transparent 100%
+  );
+}
+
+.ambient-gradient-linear {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-color) 2%, transparent) 0%,
+    color-mix(in srgb, var(--brand-color) 6%, transparent) 16%,
+    color-mix(in srgb, var(--brand-color) 12%, transparent) 30%,
+    color-mix(in srgb, var(--brand-color) 6%, transparent) 50%,
+    color-mix(in srgb, var(--brand-color) 1%, transparent) 75%,
+    transparent 100%
+  );
+}
