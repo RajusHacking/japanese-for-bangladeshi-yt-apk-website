@@ -106,3 +106,15 @@ body:not(.app-loaded) .stagger-animate > *:nth-child(n+6) { animation-delay: 600
     transparent 100%
   );
 }
+
+/* Custom YouTube player engine masking: completely crops title, avatars, AI tags, and watermarks */
+.yt-masked-engine {
+  transform: scale(1.44);
+  transform-origin: center center;
+}
+
+@media (min-width: 640px) {
+  .yt-masked-engine {
+    transform: scale(1.26);
+  }
+}

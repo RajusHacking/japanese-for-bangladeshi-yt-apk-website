@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Video, FileText, Check, Trash2, Edit2, Upload, AlertCircle, Save, XCircle, Link as LinkIcon, Eye, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -20,6 +20,7 @@ const ControlPage = () => {
   const [csvContent, setCsvContent] = useState(null);
   const [editId, setEditId] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Computed YouTube ID and Title for preview
   const [youtubeId, setYoutubeId] = useState('');
@@ -168,6 +169,9 @@ const ControlPage = () => {
     setCsvFile(null);
     setCsvContent(null);
     setEditId(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSave = async (e) => {
@@ -361,6 +365,8 @@ const ControlPage = () => {
     return null; // Will redirect via useEffect
   }
 
+  const currentCsvName = csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName : null);
+
   return (
     <div className="w-full flex-1 p-4 md:p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
@@ -386,7 +392,7 @@ const ControlPage = () => {
               <Video size={16} /> Video Link
             </label>
             <input 
-              type="text"
+              type="text" 
               placeholder="Paste YouTube Link"
               value={videoInput}
               onChange={(e) => setVideoInput(e.target.value)}
@@ -407,7 +413,7 @@ const ControlPage = () => {
               )}
             </label>
             <input 
-              type="text"
+              type="text" 
               placeholder="e.g. https://j4b.vercel.app/Episode-10"
               value={detectedLink}
               onChange={(e) => setDetectedLink(e.target.value)}
@@ -416,20 +422,70 @@ const ControlPage = () => {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-              <Upload size={16} /> CSV File Upload
-            </label>
-            <label className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-              <input 
-                type="file" 
-                accept=".csv" 
-                onChange={handleFileChange} 
-                className="hidden" 
-              />
-              <Upload size={18} className="text-gray-400" />
-              <span className="text-sm text-gray-500 font-medium truncate">
-                {csvFile ? csvFile.name : 'Choose a .csv file'}
+            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Upload size={16} /> CSV File Upload
               </span>
+              {currentCsvName && (
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                  <Check size={12} strokeWidth={3} /> Selected
+                </span>
+              )}
+            </label>
+            <label 
+              className={`w-full flex items-center justify-between px-4 py-3 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                currentCsvName 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
+                  : 'border-dashed border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5 bg-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleFileChange} 
+                  className="hidden" 
+                />
+                {currentCsvName ? (
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Check size={18} strokeWidth={2.5} />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-400 flex items-center justify-center shrink-0">
+                    <Upload size={18} />
+                  </div>
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-sm truncate font-medium ${
+                    currentCsvName ? 'text-emerald-900 dark:text-emerald-100 font-semibold' : 'text-gray-500'
+                  }`}>
+                    {currentCsvName || 'Choose a .csv file'}
+                  </span>
+                  {currentCsvName && (
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                      Click to choose a different file
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {currentCsvName && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCsvFile(null);
+                    setCsvContent(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="p-1.5 text-emerald-600 hover:text-red-500 dark:text-emerald-400 dark:hover:text-red-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors ml-2 shrink-0"
+                  title="Remove CSV file"
+                >
+                  <XCircle size={18} />
+                </button>
+              )}
             </label>
           </div>
 

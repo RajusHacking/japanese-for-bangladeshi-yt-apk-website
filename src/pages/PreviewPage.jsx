@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, AlertCircle, Copy, Check } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { AlertCircle, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../context/LanguageContext';
+import MinimalPlayer from '../components/common/MinimalPlayer';
 
 const NOT_FOUND_TEXT = {
   bn: 'এই ভিডিওতে রিসোর্স নেই',
@@ -176,81 +177,75 @@ const PreviewPage = () => {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[#f3f4f6] dark:bg-black py-8">
-      <div className="container mx-auto px-4 flex flex-col items-center">
-        <div className="w-full max-w-2xl">
-          <Link 
-            to="/control" 
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-6 transition-colors"
-          >
-            <ArrowLeft size={16} /> Back to Control Panel
-          </Link>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-8"
-          >
-            {/* YouTube Video Player */}
-            <div className="w-full bg-black rounded-2xl overflow-hidden shadow-sm aspect-video relative border border-gray-200 dark:border-white/10">
-              {episodeData.youtubeId ? (
-                <iframe 
-                  src={`https://www.youtube.com/embed/${episodeData.youtubeId}`} 
-                  title={`Preview Video`}
-                  frameBorder="0" 
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                  allowFullScreen
-                  className="absolute inset-0 w-full h-full"
-                ></iframe>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-white/50">
-                  No video preview available
-                </div>
-              )}
+    <div className="w-full min-h-screen bg-[#f3f4f6] dark:bg-black pb-20 flex flex-col items-center">
+      {/* Sticky Wide Theater Video Section (Full Area) */}
+      <div className="sticky top-16 z-20 w-full bg-black sm:bg-[#f3f4f6]/95 dark:sm:bg-black/95 backdrop-blur-md pt-0 sm:pt-2 pb-0 sm:pb-4 shadow-sm border-b border-gray-200/50 dark:border-white/5 flex justify-center">
+        <div className="w-full max-w-5xl px-0 sm:px-4">
+          {episodeData.youtubeId ? (
+            <MinimalPlayer 
+              youtubeId={episodeData.youtubeId} 
+              title={episodeData.videoTitle || 'Preview Video'} 
+            />
+          ) : (
+            <div className="w-full bg-black rounded-none sm:rounded-2xl overflow-hidden shadow-lg aspect-video relative border-y sm:border border-gray-200 dark:border-white/10 flex items-center justify-center text-white/50">
+              No video preview available
             </div>
+          )}
+        </div>
+      </div>
 
-            {/* CSV Cards List */}
-            <div className="flex flex-col gap-4">
-              {parsedCsv.rows.map((row, rowIndex) => (
+      {/* Centered Scrollable CSV Cards List */}
+      <div className="w-full max-w-2xl px-4 pt-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-3.5"
+        >
+          {parsedCsv.rows.map((row, rowIndex) => (
                 <div 
                   key={rowIndex} 
                   className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-white/10 overflow-hidden"
                 >
-                  <div className="px-5 pt-4 pb-2">
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                      PAGE {rowIndex + 1}
+                  {/* Card Number in Scheme Color */}
+                  <div className="px-5 pt-3.5 pb-2 flex items-center justify-between">
+                    <span 
+                      className="text-base font-extrabold tracking-tight"
+                      style={{ color: 'var(--brand-color, #f97316)' }}
+                    >
+                      {rowIndex + 1}
                     </span>
                   </div>
                   
-                  <div className="flex flex-col pb-3">
+                  {/* Card Values (No Labels) */}
+                  <div className="flex flex-col pb-1">
                     {parsedCsv.headers.map((header, cellIndex) => {
+                      const h = (header || '').trim().toLowerCase();
+                      if (cellIndex === 0 && ['id', 'sl', 'sl.', 'no', 'num', 'index', 'page'].includes(h)) {
+                        return null;
+                      }
+
                       const value = row[cellIndex] || '';
+                      if (!value) return null;
                       const copyKey = `${rowIndex}-${cellIndex}`;
                       const isCopied = copiedStates[copyKey];
 
                       return (
                         <div 
                           key={cellIndex} 
-                          className="flex items-center px-5 py-2.5 border-t border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
+                          className="flex items-center justify-between px-5 py-2.5 border-t border-gray-100 dark:border-white/5 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors group"
                         >
-                          <div className="w-28 shrink-0">
-                            <span className="text-[13px] font-bold text-slate-500 dark:text-slate-400 tracking-wide">
-                              {header}
-                            </span>
-                          </div>
-                          
-                          <div className="flex-1 pr-4">
-                            <span className="text-[15px] text-gray-800 dark:text-gray-200">
+                          <div className="flex-1 pr-3">
+                            <span className="text-[15px] text-gray-800 dark:text-gray-200 select-text leading-relaxed">
                               {value}
                             </span>
                           </div>
                           
                           <button
                             onClick={() => handleCopy(value, copyKey)}
-                            className="w-8 h-8 flex items-center justify-center rounded bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-white/10 dark:text-gray-400 dark:hover:bg-white/20 dark:hover:text-white transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-white/10 dark:text-gray-400 dark:hover:bg-white/20 dark:hover:text-white transition-colors shrink-0"
                             title="Copy to clipboard"
                           >
-                            {isCopied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                            {isCopied ? <Check size={15} className="text-green-500" /> : <Copy size={15} />}
                           </button>
                         </div>
                       );
@@ -264,11 +259,8 @@ const PreviewPage = () => {
                   No CSV data available for this preview.
                 </div>
               )}
-            </div>
-
           </motion.div>
         </div>
-      </div>
     </div>
   );
 };

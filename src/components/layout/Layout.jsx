@@ -27,7 +27,7 @@ const Layout = ({ children }) => {
       <div ref={topBarRef}>
         <TopBar />
       </div>
-      <main className="flex-1 flex flex-col relative overflow-hidden pb-24">
+      <main className="flex-1 flex flex-col relative overflow-x-clip pb-24">
         <div className="absolute inset-0 ambient-gradient-glow -z-10 opacity-30"></div>
         {children}
       </main>
