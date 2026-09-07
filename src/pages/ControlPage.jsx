@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Video, FileText, Check, Trash2, Edit2, Upload, AlertCircle, Save, XCircle, Link as LinkIcon, Eye, LogOut, FileCode } from 'lucide-react';
+import { Video, FileText, Check, Trash2, Edit2, Upload, AlertCircle, Save, XCircle, Link as LinkIcon, Eye, LogOut, FileCode } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -399,7 +399,7 @@ const ControlPage = () => {
   if (checkingAuth) {
     return (
       <div className="w-full flex-1 flex items-center justify-center min-h-[calc(100vh-160px)]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-200 dark:border-zinc-700 border-t-[var(--brand-color,#f97316)]"></div>
       </div>
     );
   }
@@ -411,334 +411,399 @@ const ControlPage = () => {
   const currentCsvName = csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName : null);
   const currentJsonName = jsonFile ? jsonFile.name : (editId ? (savedItems.find(i => i.id === editId)?.jsonFileName || (savedItems.find(i => i.id === editId)?.jsonContent ? 'Quiz.json' : null)) : null);
 
+  const fieldClass =
+    'w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-brand/50 focus:ring-2 focus:ring-brand/20 transition-shadow';
+
+  const labelClass = 'text-xs font-medium text-zinc-500 dark:text-zinc-400 tracking-wide';
+
   return (
-    <div className="w-full flex-1 p-4 md:p-6 lg:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Control Panel</h1>
-        <button 
-          onClick={handleLogout}
-          className="px-4 py-2 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg transition-colors font-medium flex items-center gap-2"
-        >
-          <LogOut size={16} /> Sign out
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        
-        {/* Left Column: Control Panel Form */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/10 rounded-2xl p-5 shadow-sm flex flex-col gap-5"
-        >
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-              <Video size={16} /> Video Link
-            </label>
-            <input 
-              type="text" 
-              placeholder="Paste YouTube Link"
-              value={videoInput}
-              onChange={(e) => setVideoInput(e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand dark:text-white"
-            />
+    <div className="w-full flex-1 min-h-[calc(100vh-4rem)] bg-slate-50/70 dark:bg-[#09090b] pb-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-white tracking-tight">
+              Control
+            </h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Manage episode resources
+            </p>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <LinkIcon size={16} /> Resource Link
-              </span>
-              {isDetecting && (
-                <span className="text-xs text-brand flex items-center gap-1">
-                  <div className="w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
-                  Detecting...
-                </span>
-              )}
-            </label>
-            <input 
-              type="text" 
-              placeholder="e.g. https://j4b.vercel.app/Episode-10"
-              value={detectedLink}
-              onChange={(e) => setDetectedLink(e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand dark:text-white"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Upload size={16} /> Vocabulary CSV File Upload
-              </span>
-              {currentCsvName && (
-                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
-                  <Check size={12} strokeWidth={3} /> Selected
-                </span>
-              )}
-            </label>
-            <label 
-              className={`w-full flex items-center justify-between px-4 py-3 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                currentCsvName 
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
-                  : 'border-dashed border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5 bg-transparent'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  accept=".csv" 
-                  onChange={handleFileChange} 
-                  className="hidden" 
-                />
-                {currentCsvName ? (
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-                    <Check size={18} strokeWidth={2.5} />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-400 flex items-center justify-center shrink-0">
-                    <Upload size={18} />
-                  </div>
-                )}
-                <div className="flex flex-col min-w-0">
-                  <span className={`text-sm truncate font-medium ${
-                    currentCsvName ? 'text-emerald-900 dark:text-emerald-100 font-semibold' : 'text-gray-500'
-                  }`}>
-                    {currentCsvName || 'Choose a .csv vocabulary file'}
-                  </span>
-                  {currentCsvName && (
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
-                      Click to choose a different CSV file
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {currentCsvName && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setCsvFile(null);
-                    setCsvContent(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  className="p-1.5 text-emerald-600 hover:text-red-500 dark:text-emerald-400 dark:hover:text-red-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors ml-2 shrink-0 cursor-pointer"
-                  title="Remove CSV file"
-                >
-                  <XCircle size={18} />
-                </button>
-              )}
-            </label>
-          </div>
-
-          {/* Quiz JSON File Upload */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <FileCode size={16} /> Quiz JSON File Upload
-              </span>
-              {currentJsonName && (
-                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
-                  <Check size={12} strokeWidth={3} /> Selected
-                </span>
-              )}
-            </label>
-            <label 
-              className={`w-full flex items-center justify-between px-4 py-3 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                currentJsonName 
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
-                  : 'border-dashed border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5 bg-transparent'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <input 
-                  ref={jsonFileInputRef}
-                  type="file" 
-                  accept=".json" 
-                  onChange={handleJsonFileChange} 
-                  className="hidden" 
-                />
-                {currentJsonName ? (
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-                    <Check size={18} strokeWidth={2.5} />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-400 flex items-center justify-center shrink-0">
-                    <FileCode size={18} />
-                  </div>
-                )}
-                <div className="flex flex-col min-w-0">
-                  <span className={`text-sm truncate font-medium ${
-                    currentJsonName ? 'text-emerald-900 dark:text-emerald-100 font-semibold' : 'text-gray-500'
-                  }`}>
-                    {currentJsonName || 'Choose a .json quiz file'}
-                  </span>
-                  {currentJsonName && (
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
-                      Click to choose a different JSON file
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {currentJsonName && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setJsonFile(null);
-                    setJsonContent(null);
-                    if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
-                  }}
-                  className="p-1.5 text-emerald-600 hover:text-red-500 dark:text-emerald-400 dark:hover:text-red-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors ml-2 shrink-0 cursor-pointer"
-                  title="Remove JSON file"
-                >
-                  <XCircle size={18} />
-                </button>
-              )}
-            </label>
-          </div>
-
-          <div className="flex items-center gap-3 pt-2">
-            <button 
-              type="button"
-              onClick={handleClear}
-              className="flex-1 py-2.5 bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-gray-300 font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-            >
-              <XCircle size={18} /> Clear
-            </button>
-            <button 
-              type="button"
-              onClick={handleSave}
-              className="flex-1 py-2.5 bg-brand text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-            >
-              <Save size={18} /> {editId ? 'Update' : 'Save'}
-            </button>
-          </div>
-        </motion.div>
-
-        {/* Center Column: Saved Data List */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm">
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <input 
-                type="checkbox" 
-                checked={selectedItems.length === savedItems.length && savedItems.length > 0}
-                onChange={toggleSelectAll}
-                className="w-5 h-5 rounded border-gray-300 text-brand focus:ring-brand"
-              />
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                Saved Items ({savedItems.length})
-              </span>
-            </label>
-            
-            {selectedItems.length > 0 && (
-              <button 
-                onClick={handleBulkDelete}
-                className="px-3 py-1.5 bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400 font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors flex items-center gap-1.5 text-sm"
-              >
-                <Trash2 size={14} /> Delete
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3 max-h-[calc(100vh-250px)] overflow-y-auto pr-2 custom-scrollbar">
-            {savedItems.map((item) => (
-              <div 
-                key={item.id} 
-                className={`flex flex-col gap-3 p-4 rounded-xl border transition-colors ${
-                  selectedItems.includes(item.id) 
-                    ? 'bg-brand/5 border-brand/30 dark:bg-brand/10 dark:border-brand/30' 
-                    : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-white/10'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedItems.includes(item.id)}
-                      onChange={() => toggleSelect(item.id)}
-                      className="w-5 h-5 mt-0.5 rounded border-gray-300 text-brand focus:ring-brand shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                        {item.videoTitle || 'YouTube Video'}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="px-2 py-1 bg-brand/10 text-brand text-xs rounded font-medium">
-                          {item.detectedLink || 'No link detected'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Link 
-                      to={item.detectedLink || '#'} 
-                      target="_blank"
-                      className="p-2 text-gray-400 hover:text-brand hover:bg-brand/10 rounded transition-colors"
-                      title="Preview Page"
-                    >
-                      <Eye size={16} />
-                    </Link>
-                    <button 
-                      onClick={() => handleEdit(item)}
-                      className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded-md transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-md transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 pl-8">
-                  {item.csvFileName ? (
-                    <span className="flex items-center gap-1 bg-gray-100 dark:bg-black px-2 py-0.5 rounded text-xs text-gray-600 dark:text-gray-300">
-                      <FileText size={12} className="text-brand" /> 
-                      {item.csvFileName}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-orange-500">
-                      <AlertCircle size={12} /> No CSV
-                    </span>
-                  )}
-                  {item.jsonFileName || item.jsonContent ? (
-                    <span className="flex items-center gap-1 bg-gray-100 dark:bg-black px-2 py-0.5 rounded text-xs text-emerald-600 dark:text-emerald-400">
-                      <FileCode size={12} className="text-emerald-500" /> 
-                      {item.jsonFileName || 'Quiz JSON'}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-gray-400">
-                      <AlertCircle size={12} /> No Quiz
-                    </span>
-                  )}
-                  {item.youtubeId && (
-                    <span className="flex items-center gap-1 bg-gray-100 dark:bg-black px-2 py-0.5 rounded text-xs text-gray-600 dark:text-gray-300">
-                      <Check size={12} className="text-green-500" /> ID: {item.youtubeId}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-            
-            {savedItems.length === 0 && (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-zinc-900/50 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
-                No saved items yet.
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="px-3 py-2 text-sm text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <LogOut size={15} />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Form */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl p-5 sm:p-6 flex flex-col gap-5"
+          >
+            {editId && (
+              <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-brand/10 border border-brand/20">
+                <span className="text-xs font-medium text-brand">
+                  Editing episode
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label className={`${labelClass} flex items-center gap-1.5`}>
+                <Video size={13} /> Video link
+              </label>
+              <input
+                type="text"
+                placeholder="Paste YouTube URL"
+                value={videoInput}
+                onChange={(e) => setVideoInput(e.target.value)}
+                className={fieldClass}
+              />
+              {videoTitle && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate pt-0.5">
+                  {videoTitle}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className={`${labelClass} flex items-center justify-between`}>
+                <span className="flex items-center gap-1.5">
+                  <LinkIcon size={13} /> Resource link
+                </span>
+                {isDetecting && (
+                  <span className="text-[11px] flex items-center gap-1.5" style={{ color: 'var(--brand-color, #f97316)' }}>
+                    <span className="w-2.5 h-2.5 border-[1.5px] border-current border-t-transparent rounded-full animate-spin" />
+                    Detecting
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                placeholder="link will appear here"
+                value={detectedLink}
+                onChange={(e) => setDetectedLink(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+
+            {/* CSV Upload */}
+            <div className="flex flex-col gap-1.5">
+              <label className={`${labelClass} flex items-center gap-1.5`}>
+                <Upload size={13} /> Vocabulary CSV
+              </label>
+              <label
+                className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${
+                  currentCsvName
+                    ? 'border-brand/40 bg-brand/[0.06]'
+                    : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
+                    currentCsvName
+                      ? 'text-white'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                  }`}
+                    style={currentCsvName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
+                  >
+                    {currentCsvName ? <Check size={15} strokeWidth={2.5} /> : <Upload size={15} />}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className={`text-sm truncate ${
+                      currentCsvName
+                        ? 'text-zinc-900 dark:text-zinc-100 font-medium'
+                        : 'text-zinc-500 dark:text-zinc-400'
+                    }`}>
+                      {currentCsvName || 'Choose .csv file'}
+                    </span>
+                  </div>
+                </div>
+                {currentCsvName && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setCsvFile(null);
+                      setCsvContent(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="p-1.5 text-zinc-400 hover:text-rose-500 rounded-md transition-colors shrink-0 cursor-pointer"
+                    title="Remove CSV"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                )}
+              </label>
+            </div>
+
+            {/* JSON Upload */}
+            <div className="flex flex-col gap-1.5">
+              <label className={`${labelClass} flex items-center gap-1.5`}>
+                <FileCode size={13} /> Quiz JSON
+              </label>
+              <label
+                className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${
+                  currentJsonName
+                    ? 'border-brand/40 bg-brand/[0.06]'
+                    : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <input
+                    ref={jsonFileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleJsonFileChange}
+                    className="hidden"
+                  />
+                  <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
+                    currentJsonName
+                      ? 'text-white'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                  }`}
+                    style={currentJsonName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
+                  >
+                    {currentJsonName ? <Check size={15} strokeWidth={2.5} /> : <FileCode size={15} />}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className={`text-sm truncate ${
+                      currentJsonName
+                        ? 'text-zinc-900 dark:text-zinc-100 font-medium'
+                        : 'text-zinc-500 dark:text-zinc-400'
+                    }`}>
+                      {currentJsonName || 'Choose .json file'}
+                    </span>
+                  </div>
+                </div>
+                {currentJsonName && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setJsonFile(null);
+                      setJsonContent(null);
+                      if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
+                    }}
+                    className="p-1.5 text-zinc-400 hover:text-rose-500 rounded-md transition-colors shrink-0 cursor-pointer"
+                    title="Remove JSON"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                )}
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleClear}
+                className="flex-1 py-2.5 bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-lg hover:bg-zinc-200/80 dark:hover:bg-white/[0.1] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="flex-1 py-2.5 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer"
+                style={{ backgroundColor: 'var(--brand-color, #f97316)' }}
+              >
+                <Save size={15} />
+                {editId ? 'Update' : 'Save'}
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Saved list */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl px-3.5 py-2.5">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2.5 cursor-pointer select-none group"
+              >
+                <span
+                  className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors shrink-0 ${
+                    selectedItems.length === savedItems.length && savedItems.length > 0
+                      ? 'border-transparent text-white'
+                      : 'border-zinc-300 dark:border-zinc-600 bg-transparent group-hover:border-zinc-400'
+                  }`}
+                  style={
+                    selectedItems.length === savedItems.length && savedItems.length > 0
+                      ? { backgroundColor: 'var(--brand-color, #f97316)' }
+                      : undefined
+                  }
+                >
+                  {selectedItems.length === savedItems.length && savedItems.length > 0 && (
+                    <Check size={12} strokeWidth={3} />
+                  )}
+                </span>
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Saved
+                  <span className="ml-1.5 text-zinc-400 dark:text-zinc-500 font-normal tabular-nums">
+                    {savedItems.length}
+                  </span>
+                </span>
+              </button>
+
+              {selectedItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  className="px-2.5 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 font-medium rounded-lg transition-colors flex items-center gap-1.5 text-xs cursor-pointer"
+                >
+                  <Trash2 size={13} /> Delete ({selectedItems.length})
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 max-h-[calc(100vh-220px)] overflow-y-auto pr-0.5 custom-scrollbar">
+              {isLoadingData ? (
+                <div className="py-16 flex justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-200 dark:border-zinc-700 border-t-[var(--brand-color,#f97316)]" />
+                </div>
+              ) : (
+                <>
+                  {savedItems.map((item) => {
+                    const selected = selectedItems.includes(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        className={`group/card rounded-xl border transition-colors overflow-hidden ${
+                          selected
+                            ? 'bg-brand/[0.05] border-brand/35'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.12]'
+                        }`}
+                      >
+                        <div className="flex items-stretch">
+                          {/* Select */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSelect(item.id)}
+                            className={`w-11 shrink-0 flex items-center justify-center border-r transition-colors cursor-pointer ${
+                              selected
+                                ? 'border-brand/20 bg-brand/[0.08]'
+                                : 'border-zinc-100 dark:border-white/[0.06] hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                            }`}
+                            title={selected ? 'Deselect' : 'Select'}
+                            aria-pressed={selected}
+                          >
+                            <span
+                              className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors ${
+                                selected
+                                  ? 'border-transparent text-white'
+                                  : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
+                              }`}
+                              style={
+                                selected
+                                  ? { backgroundColor: 'var(--brand-color, #f97316)' }
+                                  : undefined
+                              }
+                            >
+                              {selected && <Check size={12} strokeWidth={3} />}
+                            </span>
+                          </button>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0 p-3.5 flex flex-col gap-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate leading-snug">
+                                  {item.videoTitle || 'YouTube Video'}
+                                </h3>
+                                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                                  {item.detectedLink || 'No resource link'}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-0.5 shrink-0 -mr-1 -mt-0.5">
+                                <Link
+                                  to={item.detectedLink || '#'}
+                                  target="_blank"
+                                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md transition-colors"
+                                  title="Preview"
+                                >
+                                  <Eye size={15} />
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEdit(item)}
+                                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-md transition-colors cursor-pointer"
+                                  title="Edit"
+                                >
+                                  <Edit2 size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="p-1.5 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-md transition-colors cursor-pointer"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {item.csvFileName ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.05]">
+                                  <FileText size={11} />
+                                  {item.csvFileName}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
+                                  <AlertCircle size={11} /> No CSV
+                                </span>
+                              )}
+                              {item.jsonFileName || item.jsonContent ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.05]">
+                                  <FileCode size={11} />
+                                  {item.jsonFileName || 'Quiz JSON'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
+                                  <AlertCircle size={11} /> No Quiz
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {savedItems.length === 0 && (
+                    <div className="py-14 text-center rounded-xl border border-dashed border-zinc-200 dark:border-white/10 bg-white/60 dark:bg-zinc-900/40">
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">No saved episodes yet</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
