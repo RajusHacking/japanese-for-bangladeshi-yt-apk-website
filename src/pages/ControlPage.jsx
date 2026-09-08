@@ -18,12 +18,12 @@ const ControlPage = () => {
   const [detectedLink, setDetectedLink] = useState('');
   const [csvFile, setCsvFile] = useState(null);
   const [csvContent, setCsvContent] = useState(null);
-  const [jsonFile, setJsonFile] = useState(null);
-  const [jsonContent, setJsonContent] = useState(null);
+  const [quizFile, setQuizFile] = useState(null);
+  const [quizContent, setQuizContent] = useState(null);
   const [editId, setEditId] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const fileInputRef = useRef(null);
-  const jsonFileInputRef = useRef(null);
+  const quizFileInputRef = useRef(null);
 
   // Computed YouTube ID and Title for preview
   const [youtubeId, setYoutubeId] = useState('');
@@ -153,36 +153,71 @@ const ControlPage = () => {
     };
   }, [videoInput]);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setCsvFile(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCsvContent(event.target.result);
-      };
-      reader.readAsText(file);
-    }
+  const readTextFile = (file, type) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target.result;
+
+      if (type === 'quiz') {
+        try {
+          JSON.parse(content);
+        } catch (err) {
+          alert("Invalid JSON format! Please upload a valid JSON or TXT file containing valid JSON.");
+          setQuizFile(null);
+          setQuizContent(null);
+          if (quizFileInputRef.current) quizFileInputRef.current.value = '';
+          return;
+        }
+        setQuizFile(file);
+        setQuizContent(content);
+      } else {
+        setCsvFile(file);
+        setCsvContent(content);
+      }
+    };
+    reader.onerror = () => alert("Could not read the selected file.");
+    reader.readAsText(file);
   };
 
-  const handleJsonFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setJsonFile(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          JSON.parse(event.target.result);
-          setJsonContent(event.target.result);
-        } catch (err) {
-          alert("Invalid JSON format! Please upload a valid JSON file.");
-          setJsonFile(null);
-          setJsonContent(null);
-          if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
-        }
-      };
-      reader.readAsText(file);
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) readTextFile(file, 'csv');
+  };
+
+  const handleQuizFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) readTextFile(file, 'quiz');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (type === 'csv') {
+      if (!/\.csv$/i.test(file.name)) {
+        alert("Please drop a .csv file.");
+        return;
+      }
+      readTextFile(file, 'csv');
+      return;
     }
+
+    if (!/\.(json|txt)$/i.test(file.name)) {
+      alert("Please drop a .json or .txt file.");
+      return;
+    }
+    readTextFile(file, 'quiz');
   };
 
   const handleClear = () => {
@@ -191,14 +226,14 @@ const ControlPage = () => {
     setVideoTitle('');
     setCsvFile(null);
     setCsvContent(null);
-    setJsonFile(null);
-    setJsonContent(null);
+    setQuizFile(null);
+    setQuizContent(null);
     setEditId(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    if (jsonFileInputRef.current) {
-      jsonFileInputRef.current.value = '';
+    if (quizFileInputRef.current) {
+      quizFileInputRef.current.value = '';
     }
   };
 
@@ -301,12 +336,22 @@ const ControlPage = () => {
       }
     }
 
-    const newJsonContent = jsonContent !== null ? jsonContent : (editId ? savedItems.find(i => i.id === editId)?.jsonContent || null : null);
-    let newJsonName = jsonFile ? jsonFile.name : (editId ? savedItems.find(i => i.id === editId)?.jsonFileName || null : null);
-    if (newJsonContent && detectedLink) {
+    const newQuizContent = quizContent !== null
+      ? quizContent
+      : (editId ? savedItems.find(i => i.id === editId)?.jsonContent || null : null);
+
+    let newQuizName = quizFile
+      ? quizFile.name
+      : (editId ? savedItems.find(i => i.id === editId)?.jsonFileName || null : null);
+
+    if (newQuizContent && detectedLink) {
       const match = detectedLink.match(/https?:\/\/j4b\.vercel\.app\/([a-zA-Z0-9-]+)/i);
       if (match && match[1]) {
-        newJsonName = `${match[1]}.json`;
+        const extension =
+          quizFile?.name?.match(/\.(json|txt)$/i)?.[1]?.toLowerCase() ||
+          newQuizName?.match(/\.(json|txt)$/i)?.[1]?.toLowerCase() ||
+          'json';
+        newQuizName = `${match[1]}.${extension}`;
       }
     }
 
@@ -318,8 +363,8 @@ const ControlPage = () => {
       videoTitle,
       csvFileName: newCsvName,
       csvContent: newCsvContent,
-      jsonFileName: newJsonName,
-      jsonContent: newJsonContent,
+      quizFileName: newQuizName,
+      quizContent: newQuizContent,
       timestamp: Date.now()
     };
 
@@ -344,8 +389,8 @@ const ControlPage = () => {
     setVideoTitle(item.videoTitle || '');
     setCsvContent(item.csvContent || null);
     setCsvFile(null);
-    setJsonContent(item.jsonContent || null);
-    setJsonFile(null);
+    setQuizContent(item.quizContent || null);
+    setQuizFile(null);
     setEditId(item.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -409,7 +454,7 @@ const ControlPage = () => {
   }
 
   const currentCsvName = csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName : null);
-  const currentJsonName = jsonFile ? jsonFile.name : (editId ? (savedItems.find(i => i.id === editId)?.jsonFileName || (savedItems.find(i => i.id === editId)?.jsonContent ? 'Quiz.json' : null)) : null);
+  const currentQuizName = quizFile ? quizFile.name : (editId ? (savedItems.find(i => i.id === editId)?.jsonFileName || (savedItems.find(i => i.id === editId)?.jsonContent ? 'Quiz.json' : null)) : null);
 
   const fieldClass =
     'w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-brand/50 focus:ring-2 focus:ring-brand/20 transition-shadow';
@@ -439,12 +484,12 @@ const ControlPage = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start lg:h-[calc(100vh-150px)]">
           {/* Form */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl p-5 sm:p-6 flex flex-col gap-5"
+            className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl p-5 sm:p-6 flex flex-col gap-5 lg:h-full lg:min-h-0"
           >
             {editId && (
               <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-brand/10 border border-brand/20">
@@ -506,6 +551,8 @@ const ControlPage = () => {
                 <Upload size={13} /> Vocabulary CSV
               </label>
               <label
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, 'csv')}
                 className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${
                   currentCsvName
                     ? 'border-brand/40 bg-brand/[0.06]'
@@ -535,7 +582,7 @@ const ControlPage = () => {
                         ? 'text-zinc-900 dark:text-zinc-100 font-medium'
                         : 'text-zinc-500 dark:text-zinc-400'
                     }`}>
-                      {currentCsvName || 'Choose .csv file'}
+                      {currentCsvName || 'Drop .csv here, or choose a file'}
                     </span>
                   </div>
                 </div>
@@ -556,64 +603,68 @@ const ControlPage = () => {
                   </button>
                 )}
               </label>
+              <span className="text-[11px] text-zinc-400 dark:text-zinc-500">Drag & drop a .csv file here</span>
             </div>
 
-            {/* JSON Upload */}
+            {/* Quiz JSON/TXT Upload */}
             <div className="flex flex-col gap-1.5">
               <label className={`${labelClass} flex items-center gap-1.5`}>
-                <FileCode size={13} /> Quiz JSON
+                <FileCode size={13} /> Quiz JSON / TXT
               </label>
               <label
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, 'quiz')}
                 className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${
-                  currentJsonName
+                  currentQuizName
                     ? 'border-brand/40 bg-brand/[0.06]'
                     : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <input
-                    ref={jsonFileInputRef}
+                    ref={quizFileInputRef}
                     type="file"
-                    accept=".json"
-                    onChange={handleJsonFileChange}
+                    accept=".json,.txt,text/plain,application/json"
+                    onChange={handleQuizFileChange}
                     className="hidden"
                   />
                   <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
-                    currentJsonName
+                    currentQuizName
                       ? 'text-white'
                       : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
                   }`}
-                    style={currentJsonName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
+                    style={currentQuizName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
                   >
-                    {currentJsonName ? <Check size={15} strokeWidth={2.5} /> : <FileCode size={15} />}
+                    {currentQuizName ? <Check size={15} strokeWidth={2.5} /> : <FileCode size={15} />}
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className={`text-sm truncate ${
-                      currentJsonName
+                      currentQuizName
                         ? 'text-zinc-900 dark:text-zinc-100 font-medium'
                         : 'text-zinc-500 dark:text-zinc-400'
                     }`}>
-                      {currentJsonName || 'Choose .json file'}
+                      {currentQuizName || 'Drop .json or .txt here, or choose a file'}
                     </span>
                   </div>
                 </div>
-                {currentJsonName && (
+                {currentQuizName && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setJsonFile(null);
-                      setJsonContent(null);
-                      if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
+                      setQuizFile(null);
+                      setQuizContent(null);
+                      if (quizFileInputRef.current) quizFileInputRef.current.value = '';
                     }}
                     className="p-1.5 text-zinc-400 hover:text-rose-500 rounded-md transition-colors shrink-0 cursor-pointer"
-                    title="Remove JSON"
+                    title="Remove quiz file"
                   >
                     <XCircle size={16} />
                   </button>
                 )}
               </label>
+              <span className="text-[11px] text-zinc-400 dark:text-zinc-500">Drag & drop a .json or .txt file here</span>
             </div>
 
             <div className="flex items-center gap-2.5 pt-1">
@@ -637,7 +688,7 @@ const ControlPage = () => {
           </motion.div>
 
           {/* Saved list */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:h-full lg:min-h-0">
             <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl px-3.5 py-2.5">
               <button
                 type="button"
@@ -679,7 +730,7 @@ const ControlPage = () => {
               )}
             </div>
 
-            <div className="flex flex-col gap-2 max-h-[calc(100vh-220px)] overflow-y-auto pr-0.5 custom-scrollbar">
+            <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar overscroll-contain">
               {isLoadingData ? (
                 <div className="py-16 flex justify-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-200 dark:border-zinc-700 border-t-[var(--brand-color,#f97316)]" />
@@ -691,7 +742,7 @@ const ControlPage = () => {
                     return (
                       <div
                         key={item.id}
-                        className={`group/card rounded-xl border transition-colors overflow-hidden ${
+                        className={`group/card shrink-0 rounded-xl border transition-colors overflow-hidden ${
                           selected
                             ? 'bg-brand/[0.05] border-brand/35'
                             : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.12]'
@@ -777,10 +828,10 @@ const ControlPage = () => {
                                   <AlertCircle size={11} /> No CSV
                                 </span>
                               )}
-                              {item.jsonFileName || item.jsonContent ? (
+                              {item.quizFileName || item.quizContent ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.05]">
                                   <FileCode size={11} />
-                                  {item.jsonFileName || 'Quiz JSON'}
+                                  {item.quizFileName || 'Quiz JSON'}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
