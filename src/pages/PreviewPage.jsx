@@ -6,10 +6,10 @@ import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../context/LanguageContext';
 
-const NOT_FOUND_TEXT = {
-  bn: 'এই ভিডিওতে রিসোর্স নেই',
-  en: 'This video has no resource',
-  ja: 'この動画にはリソースがありません',
+const NO_DATA_TEXT = {
+  bn: 'এই পেজে কোনো তথ্য নেই',
+  en: 'No data available on this page',
+  ja: 'このページにはデータがありません',
 };
 
 const ENGLISH_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
@@ -425,15 +425,15 @@ const PreviewPage = () => {
             type="button"
             onClick={() => setActiveTab('quiz')}
             className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${activeTab === 'quiz'
-                ? 'text-zinc-900 dark:text-white'
-                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+              ? 'text-zinc-900 dark:text-white'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
               }`}
           >
             <span>Quiz</span>
             {quizzes.length > 0 && (
               <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-bold tabular-nums transition-colors ${activeTab === 'quiz'
-                  ? 'bg-brand/15 text-brand'
-                  : 'bg-black/5 dark:bg-white/10 text-zinc-500 dark:text-zinc-400'
+                ? 'bg-brand/15 text-brand'
+                : 'bg-black/5 dark:bg-white/10 text-zinc-500 dark:text-zinc-400'
                 }`}>
                 {quizzes.length}
               </span>
@@ -444,15 +444,15 @@ const PreviewPage = () => {
             type="button"
             onClick={() => setActiveTab('vocabulary')}
             className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${activeTab === 'vocabulary'
-                ? 'text-zinc-900 dark:text-white'
-                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+              ? 'text-zinc-900 dark:text-white'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
               }`}
           >
             <span>Vocabulary</span>
             {parsedCsv.rows.length > 0 && (
               <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-bold tabular-nums transition-colors ${activeTab === 'vocabulary'
-                  ? 'bg-brand/15 text-brand'
-                  : 'bg-black/5 dark:bg-white/10 text-zinc-500 dark:text-zinc-400'
+                ? 'bg-brand/15 text-brand'
+                : 'bg-black/5 dark:bg-white/10 text-zinc-500 dark:text-zinc-400'
                 }`}>
                 {parsedCsv.rows.length}
               </span>
