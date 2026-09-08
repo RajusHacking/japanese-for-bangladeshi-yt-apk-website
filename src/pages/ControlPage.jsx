@@ -157,28 +157,44 @@ const ControlPage = () => {
     if (!file) return;
 
     const reader = new FileReader();
+
     reader.onload = (event) => {
-      const content = event.target.result;
+      // Remove a possible UTF-8 BOM before JSON validation.
+      const rawContent = typeof event.target.result === 'string'
+        ? event.target.result
+        : '';
+      const content = rawContent.replace(/^\uFEFF/, '');
 
       if (type === 'quiz') {
         try {
           JSON.parse(content);
         } catch (err) {
-          alert("Invalid JSON format! Please upload a valid JSON or TXT file containing valid JSON.");
+          console.error('Invalid quiz JSON:', err);
+          alert("Invalid quiz file. The .json or .txt file must contain valid JSON.");
           setQuizFile(null);
           setQuizContent(null);
-          if (quizFileInputRef.current) quizFileInputRef.current.value = '';
+          if (quizFileInputRef.current) {
+            quizFileInputRef.current.value = '';
+          }
           return;
         }
+
+        // Keep BOTH values in React state. handleSave will persist these
+        // exact values to Firestore as jsonFileName/jsonContent.
         setQuizFile(file);
         setQuizContent(content);
-      } else {
-        setCsvFile(file);
-        setCsvContent(content);
+        return;
       }
+
+      setCsvFile(file);
+      setCsvContent(content);
     };
-    reader.onerror = () => alert("Could not read the selected file.");
-    reader.readAsText(file);
+
+    reader.onerror = () => {
+      alert("Could not read the selected file.");
+    };
+
+    reader.readAsText(file, 'UTF-8');
   };
 
   const handleFileChange = (e) => {
@@ -336,19 +352,25 @@ const ControlPage = () => {
       }
     }
 
-    const newQuizContent = quizContent !== null
-      ? quizContent
-      : (editId ? savedItems.find(i => i.id === editId)?.jsonContent || null : null);
+    const existingItem = editId
+      ? savedItems.find(i => i.id === editId)
+      : null;
 
-    let newQuizName = quizFile
+    const hasNewQuizUpload = quizFile !== null && quizContent !== null;
+
+    const newQuizContent = hasNewQuizUpload
+      ? quizContent
+      : (existingItem?.jsonContent ?? null);
+
+    let newQuizName = hasNewQuizUpload
       ? quizFile.name
-      : (editId ? savedItems.find(i => i.id === editId)?.jsonFileName || null : null);
+      : (existingItem?.jsonFileName ?? null);
 
     if (newQuizContent && detectedLink) {
       const match = detectedLink.match(/https?:\/\/j4b\.vercel\.app\/([a-zA-Z0-9-]+)/i);
       if (match && match[1]) {
         const extension =
-          quizFile?.name?.match(/\.(json|txt)$/i)?.[1]?.toLowerCase() ||
+          (hasNewQuizUpload && quizFile?.name?.match(/\.(json|txt)$/i)?.[1]?.toLowerCase()) ||
           newQuizName?.match(/\.(json|txt)$/i)?.[1]?.toLowerCase() ||
           'json';
         newQuizName = `${match[1]}.${extension}`;
@@ -379,7 +401,15 @@ const ControlPage = () => {
       handleClear();
     } catch (error) {
       console.error("Error saving document: ", error);
-      alert("Failed to save to Firebase");
+
+      const message = String(error?.message || '');
+      if (/maximum size|too large|1\s*MiB|document.*size/i.test(message)) {
+        alert("Quiz file is too large for a Firestore document. Please use a smaller JSON/TXT quiz file.");
+      } else if (/permission|insufficient/i.test(message)) {
+        alert("Firebase permission denied while saving the quiz file.");
+      } else {
+        alert(`Failed to save to Firebase: ${message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -554,8 +584,8 @@ const ControlPage = () => {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'csv')}
                 className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${currentCsvName
-                  ? 'border-brand/40 bg-brand/[0.06]'
-                  : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                    ? 'border-brand/40 bg-brand/[0.06]'
+                    : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
                   }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -567,8 +597,8 @@ const ControlPage = () => {
                     className="hidden"
                   />
                   <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${currentCsvName
-                    ? 'text-white'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                      ? 'text-white'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
                     }`}
                     style={currentCsvName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
                   >
@@ -576,8 +606,8 @@ const ControlPage = () => {
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className={`text-sm truncate ${currentCsvName
-                      ? 'text-zinc-900 dark:text-zinc-100 font-medium'
-                      : 'text-zinc-500 dark:text-zinc-400'
+                        ? 'text-zinc-900 dark:text-zinc-100 font-medium'
+                        : 'text-zinc-500 dark:text-zinc-400'
                       }`}>
                       {currentCsvName || 'Drop .csv here, or choose a file'}
                     </span>
@@ -612,8 +642,8 @@ const ControlPage = () => {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'quiz')}
                 className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${currentQuizName
-                  ? 'border-brand/40 bg-brand/[0.06]'
-                  : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                    ? 'border-brand/40 bg-brand/[0.06]'
+                    : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
                   }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -625,8 +655,8 @@ const ControlPage = () => {
                     className="hidden"
                   />
                   <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${currentQuizName
-                    ? 'text-white'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                      ? 'text-white'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
                     }`}
                     style={currentQuizName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
                   >
@@ -634,8 +664,8 @@ const ControlPage = () => {
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className={`text-sm truncate ${currentQuizName
-                      ? 'text-zinc-900 dark:text-zinc-100 font-medium'
-                      : 'text-zinc-500 dark:text-zinc-400'
+                        ? 'text-zinc-900 dark:text-zinc-100 font-medium'
+                        : 'text-zinc-500 dark:text-zinc-400'
                       }`}>
                       {currentQuizName || 'Drop .json or .txt here, or choose a file'}
                     </span>
@@ -691,8 +721,8 @@ const ControlPage = () => {
               >
                 <span
                   className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedItems.length === savedItems.length && savedItems.length > 0
-                    ? 'border-transparent text-white'
-                    : 'border-zinc-300 dark:border-zinc-600 bg-transparent group-hover:border-zinc-400'
+                      ? 'border-transparent text-white'
+                      : 'border-zinc-300 dark:border-zinc-600 bg-transparent group-hover:border-zinc-400'
                     }`}
                   style={
                     selectedItems.length === savedItems.length && savedItems.length > 0
@@ -736,8 +766,8 @@ const ControlPage = () => {
                       <div
                         key={item.id}
                         className={`group/card shrink-0 h-[90px] rounded-xl border transition-colors overflow-hidden snap-start ${selected
-                          ? 'bg-brand/[0.05] border-brand/35'
-                          : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.12]'
+                            ? 'bg-brand/[0.05] border-brand/35'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.12]'
                           }`}
                       >
                         <div className="flex items-stretch">
@@ -746,16 +776,16 @@ const ControlPage = () => {
                             type="button"
                             onClick={() => toggleSelect(item.id)}
                             className={`w-11 shrink-0 flex items-center justify-center border-r transition-colors cursor-pointer ${selected
-                              ? 'border-brand/20 bg-brand/[0.08]'
-                              : 'border-zinc-100 dark:border-white/[0.06] hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                                ? 'border-brand/20 bg-brand/[0.08]'
+                                : 'border-zinc-100 dark:border-white/[0.06] hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
                               }`}
                             title={selected ? 'Deselect' : 'Select'}
                             aria-pressed={selected}
                           >
                             <span
                               className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors ${selected
-                                ? 'border-transparent text-white'
-                                : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
+                                  ? 'border-transparent text-white'
+                                  : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
                                 }`}
                               style={
                                 selected
