@@ -21,7 +21,72 @@ const getSlug = (link) => {
   return parts[parts.length - 1].toLowerCase();
 };
 
+
 const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// Randomize option positions while guaranteeing that consecutive questions
+// never place the correct answer in the same position.
+const shuffleQuizOptions = (quizList) => {
+  let previousCorrectIndex = -1;
+
+  return quizList.map((quiz) => {
+    const options = Array.isArray(quiz.options) ? [...quiz.options] : [];
+    if (options.length < 2) return { ...quiz, options };
+
+    const rawCorrect = quiz.correct_answer ?? quiz.answer ?? quiz.correctAnswer ?? '';
+
+    // Support both "the correct option text" and letter answers such as A/B/C/D.
+    let correctOriginalIndex = options.findIndex((option) => option === rawCorrect);
+    if (correctOriginalIndex === -1 && typeof rawCorrect === 'string') {
+      const answerLetter = rawCorrect.trim().toUpperCase();
+      const letterIndex = OPTION_LETTERS.indexOf(answerLetter);
+      if (letterIndex >= 0 && letterIndex < options.length) {
+        correctOriginalIndex = letterIndex;
+      }
+    }
+
+    // If the source doesn't identify a matching option, still randomize the options.
+    if (correctOriginalIndex === -1) {
+      for (let i = options.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [options[i], options[j]] = [options[j], options[i]];
+      }
+      previousCorrectIndex = -1;
+      return { ...quiz, options };
+    }
+
+    // Pick a new correct position that differs from the previous question.
+    const allowedPositions = Array.from(
+      { length: options.length },
+      (_, index) => index
+    ).filter((index) => index !== previousCorrectIndex);
+
+    const targetCorrectIndex =
+      allowedPositions[Math.floor(Math.random() * allowedPositions.length)];
+
+    const shuffled = new Array(options.length);
+    shuffled[targetCorrectIndex] = options[correctOriginalIndex];
+
+    const wrongOptions = options.filter((_, index) => index !== correctOriginalIndex);
+
+    // Fisher-Yates shuffle the wrong options independently.
+    for (let i = wrongOptions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [wrongOptions[i], wrongOptions[j]] = [wrongOptions[j], wrongOptions[i]];
+    }
+
+    let wrongIndex = 0;
+    for (let i = 0; i < shuffled.length; i++) {
+      if (i !== targetCorrectIndex) {
+        shuffled[i] = wrongOptions[wrongIndex++];
+      }
+    }
+
+    previousCorrectIndex = targetCorrectIndex;
+    return { ...quiz, options: shuffled };
+  });
+};
+
 
 const PreviewPage = () => {
   const { id } = useParams();
@@ -83,13 +148,13 @@ const PreviewPage = () => {
           try {
             const parsed = typeof match.jsonContent === 'string' ? JSON.parse(match.jsonContent) : match.jsonContent;
             if (Array.isArray(parsed)) {
-              setQuizzes(parsed);
+              setQuizzes(shuffleQuizOptions(parsed));
             } else if (parsed && Array.isArray(parsed.quizzes)) {
-              setQuizzes(parsed.quizzes);
+              setQuizzes(shuffleQuizOptions(parsed.quizzes));
             } else if (parsed && Array.isArray(parsed.quiz)) {
-              setQuizzes(parsed.quiz);
+              setQuizzes(shuffleQuizOptions(parsed.quiz));
             } else if (parsed && Array.isArray(parsed.questions)) {
-              setQuizzes(parsed.questions);
+              setQuizzes(shuffleQuizOptions(parsed.questions));
             } else {
               setQuizzes([]);
             }
@@ -237,9 +302,27 @@ const PreviewPage = () => {
   };
 
   const totalQuestions = quizzes.length;
+
+  const isCorrectQuizAnswer = (quiz, selectedOption) => {
+    const correct = quiz.correct_answer ?? quiz.answer ?? quiz.correctAnswer ?? '';
+    if (selectedOption === correct) return true;
+
+    if (typeof correct === 'string') {
+      const answerLetter = correct.trim().toUpperCase();
+      const selectedIndex = Array.isArray(quiz.options)
+        ? quiz.options.findIndex((option) => option === selectedOption)
+        : -1;
+      return (
+        selectedIndex >= 0 &&
+        OPTION_LETTERS[selectedIndex] === answerLetter
+      );
+    }
+
+    return false;
+  };
+
   const rightCount = quizzes.reduce((acc, q, idx) => {
-    const correct = q.correct_answer || q.answer || q.correctAnswer;
-    return acc + (quizAnswers[idx] === correct ? 1 : 0);
+    return acc + (isCorrectQuizAnswer(q, quizAnswers[idx]) ? 1 : 0);
   }, 0);
 
   // Score calculated out of 100
@@ -322,13 +405,13 @@ const PreviewPage = () => {
   }
 
   return (
-    <div 
+    <div
       className="w-full min-h-screen bg-slate-50/70 dark:bg-[#09090b] pb-24 flex flex-col items-center selection:bg-brand/20 selection:text-brand"
       style={{ fontFamily: ENGLISH_FONT_FAMILY }}
     >
       {/* Top Sticky Header: Toggle + Fixed Score Card (Below Toggle) */}
       <div className="sticky top-16 z-20 w-full bg-slate-50/85 dark:bg-[#09090b]/85 backdrop-blur-xl pt-3 pb-3 px-4 shadow-xs border-b border-gray-200/50 dark:border-white/[0.06] flex flex-col items-center gap-2.5">
-        
+
         {/* Toggle with Smooth Sliding Background Pill */}
         <div className="w-full max-w-sm bg-zinc-200/70 dark:bg-zinc-800/70 p-1 rounded-xl grid grid-cols-2 border border-zinc-200/60 dark:border-white/5 relative">
           <motion.div
@@ -341,19 +424,17 @@ const PreviewPage = () => {
           <button
             type="button"
             onClick={() => setActiveTab('quiz')}
-            className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${
-              activeTab === 'quiz'
+            className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${activeTab === 'quiz'
                 ? 'text-zinc-900 dark:text-white'
                 : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-            }`}
+              }`}
           >
             <span>Quiz</span>
             {quizzes.length > 0 && (
-              <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-bold tabular-nums transition-colors ${
-                activeTab === 'quiz' 
-                  ? 'bg-brand/15 text-brand' 
+              <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-bold tabular-nums transition-colors ${activeTab === 'quiz'
+                  ? 'bg-brand/15 text-brand'
                   : 'bg-black/5 dark:bg-white/10 text-zinc-500 dark:text-zinc-400'
-              }`}>
+                }`}>
                 {quizzes.length}
               </span>
             )}
@@ -362,19 +443,17 @@ const PreviewPage = () => {
           <button
             type="button"
             onClick={() => setActiveTab('vocabulary')}
-            className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${
-              activeTab === 'vocabulary'
+            className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${activeTab === 'vocabulary'
                 ? 'text-zinc-900 dark:text-white'
                 : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-            }`}
+              }`}
           >
             <span>Vocabulary</span>
             {parsedCsv.rows.length > 0 && (
-              <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-bold tabular-nums transition-colors ${
-                activeTab === 'vocabulary' 
-                  ? 'bg-brand/15 text-brand' 
+              <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-bold tabular-nums transition-colors ${activeTab === 'vocabulary'
+                  ? 'bg-brand/15 text-brand'
                   : 'bg-black/5 dark:bg-white/10 text-zinc-500 dark:text-zinc-400'
-              }`}>
+                }`}>
                 {parsedCsv.rows.length}
               </span>
             )}
@@ -383,7 +462,7 @@ const PreviewPage = () => {
 
         {/* Fixed Score Card: Shows on Quiz tab, Hides on Vocabulary tab */}
         {activeTab === 'quiz' && totalQuestions > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl px-4 py-3 flex flex-col gap-2.5"
@@ -399,7 +478,7 @@ const PreviewPage = () => {
             </div>
 
             <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full rounded-full transition-all duration-500 ease-out"
                 style={{
                   width: `${scoreOutOf100}%`,
@@ -415,7 +494,7 @@ const PreviewPage = () => {
       <div className="w-full max-w-2xl px-4 pt-5">
         {/* VIEW 1: QUIZ */}
         {activeTab === 'quiz' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col gap-4"
@@ -428,10 +507,10 @@ const PreviewPage = () => {
               const correctAnswer = quiz.correct_answer || quiz.answer || quiz.correctAnswer || '';
               const userAnswer = quizAnswers[qIdx];
               const isAnswered = userAnswer !== undefined;
-              const userWasWrong = isAnswered && userAnswer !== correctAnswer;
+              const userWasWrong = isAnswered && !isCorrectQuizAnswer(quiz, userAnswer);
 
               return (
-                <div 
+                <div
                   key={qIdx}
                   className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-col gap-3"
                 >
@@ -449,7 +528,7 @@ const PreviewPage = () => {
                   <div className="grid grid-cols-1 gap-1.5 pl-0 sm:pl-7">
                     {options.map((option, optIdx) => {
                       const isSelected = userAnswer === option;
-                      const isCorrect = option === correctAnswer;
+                      const isCorrect = isCorrectQuizAnswer(quiz, option);
                       const letter = OPTION_LETTERS[optIdx] || String(optIdx + 1);
 
                       let optionClass = "border-zinc-200/90 dark:border-white/[0.08] bg-transparent text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/15 hover:bg-zinc-50 dark:hover:bg-white/[0.03]";
@@ -538,14 +617,14 @@ const PreviewPage = () => {
 
         {/* VIEW 2: VOCABULARY */}
         {activeTab === 'vocabulary' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col gap-4"
           >
             {parsedCsv.rows.map((row, rowIndex) => (
-              <div 
-                key={rowIndex} 
+              <div
+                key={rowIndex}
                 className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-col gap-2"
               >
                 {/* Content Rows */}
@@ -560,8 +639,8 @@ const PreviewPage = () => {
                       const meta = getColMeta(cellIndex);
 
                       return (
-                        <div 
-                          key={cellIndex} 
+                        <div
+                          key={cellIndex}
                           className="flex items-start justify-between gap-2.5 group"
                         >
                           <div className="flex items-start gap-2.5 flex-1 min-w-0">
@@ -576,7 +655,7 @@ const PreviewPage = () => {
                               {value}
                             </span>
                           </div>
-                          
+
                           <button
                             onClick={() => handleCopy(value, copyKey)}
                             className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer opacity-60 group-hover:opacity-100"
@@ -591,7 +670,7 @@ const PreviewPage = () => {
                 </div>
               </div>
             ))}
-            
+
             {parsedCsv.rows.length === 0 && (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-xs flex flex-col items-center gap-3">
                 <p className="text-base font-medium text-gray-700 dark:text-gray-300">

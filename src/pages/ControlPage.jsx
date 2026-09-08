@@ -116,7 +116,7 @@ const ControlPage = () => {
           const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${id}&key=${API_KEY}`;
           const response = await fetch(apiUrl);
           const data = await response.json();
-          
+
           if (data.items && data.items.length > 0) {
             const description = data.items[0].snippet.description;
             setVideoTitle(data.items[0].snippet.title);
@@ -239,7 +239,7 @@ const ControlPage = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    
+
     if (!videoInput) {
       alert("Please enter a video link");
       return;
@@ -327,7 +327,7 @@ const ControlPage = () => {
     };
 
     const newCsvContent = csvContent !== null ? processCSV(csvContent) : (editId ? savedItems.find(i => i.id === editId)?.csvContent || null : null);
-    
+
     let newCsvName = csvFile ? csvFile.name : (editId ? savedItems.find(i => i.id === editId)?.csvFileName || null : null);
     if (newCsvContent && detectedLink) {
       const match = detectedLink.match(/https?:\/\/j4b\.vercel\.app\/([a-zA-Z0-9-]+)/i);
@@ -363,14 +363,14 @@ const ControlPage = () => {
       videoTitle,
       csvFileName: newCsvName,
       csvContent: newCsvContent,
-      quizFileName: newQuizName,
-      quizContent: newQuizContent,
+      jsonFileName: newQuizName,
+      jsonContent: newQuizContent,
       timestamp: Date.now()
     };
 
     try {
       await setDoc(doc(db, "episodes", newItem.id), newItem);
-      
+
       if (editId) {
         setSavedItems(savedItems.map(item => item.id === editId ? newItem : item).sort((a, b) => b.timestamp - a.timestamp));
       } else {
@@ -389,7 +389,7 @@ const ControlPage = () => {
     setVideoTitle(item.videoTitle || '');
     setCsvContent(item.csvContent || null);
     setCsvFile(null);
-    setQuizContent(item.quizContent || null);
+    setQuizContent(item.jsonContent || null);
     setQuizFile(null);
     setEditId(item.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -462,10 +462,10 @@ const ControlPage = () => {
   const labelClass = 'text-xs font-medium text-zinc-500 dark:text-zinc-400 tracking-wide';
 
   return (
-    <div className="w-full flex-1 min-h-[calc(100vh-4rem)] bg-slate-50/70 dark:bg-[#09090b] pb-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+    <div className="w-full min-h-[calc(100dvh-108px)] lg:h-[calc(95dvh-108px)] lg:min-h-0 overflow-visible lg:overflow-hidden bg-slate-50/70 dark:bg-[#09090b] pb-2 flex flex-col">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-3 sm:pt-4 min-h-0 lg:h-full flex flex-col w-full">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center justify-between gap-4 mb-4 shrink-0">
           <div>
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-white tracking-tight">
               Control
@@ -484,12 +484,12 @@ const ControlPage = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start lg:h-[calc(100vh-150px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           {/* Form */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl p-5 sm:p-6 flex flex-col gap-5 lg:h-full lg:min-h-0"
+            className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl p-5 sm:p-6 flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-hidden"
           >
             {editId && (
               <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-brand/10 border border-brand/20">
@@ -553,11 +553,10 @@ const ControlPage = () => {
               <label
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'csv')}
-                className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${
-                  currentCsvName
-                    ? 'border-brand/40 bg-brand/[0.06]'
-                    : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
-                }`}
+                className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${currentCsvName
+                  ? 'border-brand/40 bg-brand/[0.06]'
+                  : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                  }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <input
@@ -567,21 +566,19 @@ const ControlPage = () => {
                     onChange={handleFileChange}
                     className="hidden"
                   />
-                  <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
-                    currentCsvName
-                      ? 'text-white'
-                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
-                  }`}
+                  <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${currentCsvName
+                    ? 'text-white'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                    }`}
                     style={currentCsvName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
                   >
                     {currentCsvName ? <Check size={15} strokeWidth={2.5} /> : <Upload size={15} />}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className={`text-sm truncate ${
-                      currentCsvName
-                        ? 'text-zinc-900 dark:text-zinc-100 font-medium'
-                        : 'text-zinc-500 dark:text-zinc-400'
-                    }`}>
+                    <span className={`text-sm truncate ${currentCsvName
+                      ? 'text-zinc-900 dark:text-zinc-100 font-medium'
+                      : 'text-zinc-500 dark:text-zinc-400'
+                      }`}>
                       {currentCsvName || 'Drop .csv here, or choose a file'}
                     </span>
                   </div>
@@ -614,11 +611,10 @@ const ControlPage = () => {
               <label
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'quiz')}
-                className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${
-                  currentQuizName
-                    ? 'border-brand/40 bg-brand/[0.06]'
-                    : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
-                }`}
+                className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-lg border cursor-pointer transition-colors ${currentQuizName
+                  ? 'border-brand/40 bg-brand/[0.06]'
+                  : 'border-dashed border-zinc-300 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                  }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <input
@@ -628,21 +624,19 @@ const ControlPage = () => {
                     onChange={handleQuizFileChange}
                     className="hidden"
                   />
-                  <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
-                    currentQuizName
-                      ? 'text-white'
-                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
-                  }`}
+                  <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${currentQuizName
+                    ? 'text-white'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                    }`}
                     style={currentQuizName ? { backgroundColor: 'var(--brand-color, #f97316)' } : undefined}
                   >
                     {currentQuizName ? <Check size={15} strokeWidth={2.5} /> : <FileCode size={15} />}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className={`text-sm truncate ${
-                      currentQuizName
-                        ? 'text-zinc-900 dark:text-zinc-100 font-medium'
-                        : 'text-zinc-500 dark:text-zinc-400'
-                    }`}>
+                    <span className={`text-sm truncate ${currentQuizName
+                      ? 'text-zinc-900 dark:text-zinc-100 font-medium'
+                      : 'text-zinc-500 dark:text-zinc-400'
+                      }`}>
                       {currentQuizName || 'Drop .json or .txt here, or choose a file'}
                     </span>
                   </div>
@@ -688,7 +682,7 @@ const ControlPage = () => {
           </motion.div>
 
           {/* Saved list */}
-          <div className="flex flex-col gap-3 lg:h-full lg:min-h-0">
+          <div className="flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-hidden">
             <div className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/[0.08] rounded-xl px-3.5 py-2.5">
               <button
                 type="button"
@@ -696,11 +690,10 @@ const ControlPage = () => {
                 className="flex items-center gap-2.5 cursor-pointer select-none group"
               >
                 <span
-                  className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors shrink-0 ${
-                    selectedItems.length === savedItems.length && savedItems.length > 0
-                      ? 'border-transparent text-white'
-                      : 'border-zinc-300 dark:border-zinc-600 bg-transparent group-hover:border-zinc-400'
-                  }`}
+                  className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors shrink-0 ${selectedItems.length === savedItems.length && savedItems.length > 0
+                    ? 'border-transparent text-white'
+                    : 'border-zinc-300 dark:border-zinc-600 bg-transparent group-hover:border-zinc-400'
+                    }`}
                   style={
                     selectedItems.length === savedItems.length && savedItems.length > 0
                       ? { backgroundColor: 'var(--brand-color, #f97316)' }
@@ -730,7 +723,7 @@ const ControlPage = () => {
               )}
             </div>
 
-            <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar overscroll-contain">
+            <div className="flex flex-col gap-2 lg:h-[680px] lg:max-h-[calc(100%-48px)] lg:min-h-0 lg:overflow-y-auto lg:overflow-x-hidden overflow-visible pr-1 custom-scrollbar overscroll-contain snap-y snap-mandatory">
               {isLoadingData ? (
                 <div className="py-16 flex justify-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-200 dark:border-zinc-700 border-t-[var(--brand-color,#f97316)]" />
@@ -742,31 +735,28 @@ const ControlPage = () => {
                     return (
                       <div
                         key={item.id}
-                        className={`group/card shrink-0 rounded-xl border transition-colors overflow-hidden ${
-                          selected
-                            ? 'bg-brand/[0.05] border-brand/35'
-                            : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.12]'
-                        }`}
+                        className={`group/card shrink-0 h-[90px] rounded-xl border transition-colors overflow-hidden snap-start ${selected
+                          ? 'bg-brand/[0.05] border-brand/35'
+                          : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/[0.12]'
+                          }`}
                       >
                         <div className="flex items-stretch">
                           {/* Select */}
                           <button
                             type="button"
                             onClick={() => toggleSelect(item.id)}
-                            className={`w-11 shrink-0 flex items-center justify-center border-r transition-colors cursor-pointer ${
-                              selected
-                                ? 'border-brand/20 bg-brand/[0.08]'
-                                : 'border-zinc-100 dark:border-white/[0.06] hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
-                            }`}
+                            className={`w-11 shrink-0 flex items-center justify-center border-r transition-colors cursor-pointer ${selected
+                              ? 'border-brand/20 bg-brand/[0.08]'
+                              : 'border-zinc-100 dark:border-white/[0.06] hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                              }`}
                             title={selected ? 'Deselect' : 'Select'}
                             aria-pressed={selected}
                           >
                             <span
-                              className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors ${
-                                selected
-                                  ? 'border-transparent text-white'
-                                  : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
-                              }`}
+                              className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition-colors ${selected
+                                ? 'border-transparent text-white'
+                                : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'
+                                }`}
                               style={
                                 selected
                                   ? { backgroundColor: 'var(--brand-color, #f97316)' }
@@ -778,13 +768,13 @@ const ControlPage = () => {
                           </button>
 
                           {/* Content */}
-                          <div className="flex-1 min-w-0 p-3.5 flex flex-col gap-2.5">
+                          <div className="flex-1 min-w-0 p-3 flex flex-col gap-2">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
-                                <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate leading-snug">
+                                <h3 className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate leading-snug">
                                   {item.videoTitle || 'YouTube Video'}
                                 </h3>
-                                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
                                   {item.detectedLink || 'No resource link'}
                                 </p>
                               </div>
@@ -828,10 +818,10 @@ const ControlPage = () => {
                                   <AlertCircle size={11} /> No CSV
                                 </span>
                               )}
-                              {item.quizFileName || item.quizContent ? (
+                              {item.jsonFileName || item.jsonContent ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.05]">
                                   <FileCode size={11} />
-                                  {item.quizFileName || 'Quiz JSON'}
+                                  {item.jsonFileName || 'Quiz JSON'}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
