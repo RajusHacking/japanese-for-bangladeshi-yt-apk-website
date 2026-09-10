@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertCircle, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -98,6 +98,53 @@ const PreviewPage = () => {
   const [quizAnswers, setQuizAnswers] = useState({});
   const [copiedStates, setCopiedStates] = useState({});
   const { language } = useLanguage();
+
+  const scrollPositions = useRef({ quiz: 0, vocabulary: 0 });
+  const isSwitchingTab = useRef(false);
+
+  // Reset scroll positions when the episode id changes
+  useEffect(() => {
+    scrollPositions.current = { quiz: 0, vocabulary: 0 };
+    isSwitchingTab.current = false;
+    window.scrollTo(0, 0);
+  }, [id]);
+
+  // Track scroll position of the currently active tab
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isSwitchingTab.current) return;
+      scrollPositions.current[activeTab] = window.scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeTab]);
+
+  const handleTabChange = (newTab) => {
+    if (newTab === activeTab) return;
+    if (!isSwitchingTab.current) {
+      scrollPositions.current[activeTab] = window.scrollY;
+    }
+    isSwitchingTab.current = true;
+    setActiveTab(newTab);
+  };
+
+  // Restore the target tab's scroll position synchronously before paint
+  useLayoutEffect(() => {
+    if (!isSwitchingTab.current) return;
+
+    const targetY = scrollPositions.current[activeTab] || 0;
+    window.scrollTo(0, targetY);
+
+    const rafId = requestAnimationFrame(() => {
+      window.scrollTo(0, targetY);
+      setTimeout(() => {
+        isSwitchingTab.current = false;
+      }, 50);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [activeTab]);
 
   useEffect(() => {
     // Purge legacy public caches
@@ -423,7 +470,7 @@ const PreviewPage = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('quiz')}
+            onClick={() => handleTabChange('quiz')}
             className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${activeTab === 'quiz'
               ? 'text-zinc-900 dark:text-white'
               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -442,7 +489,7 @@ const PreviewPage = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab('vocabulary')}
+            onClick={() => handleTabChange('vocabulary')}
             className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-200 z-10 cursor-pointer ${activeTab === 'vocabulary'
               ? 'text-zinc-900 dark:text-white'
               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -493,180 +540,177 @@ const PreviewPage = () => {
       {/* Main Content Container */}
       <div className="w-full max-w-2xl px-4 pt-5">
         {/* VIEW 1: QUIZ */}
-        {activeTab === 'quiz' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-4"
-          >
-            {/* Quiz Questions List */}
-            {quizzes.map((quiz, qIdx) => {
-              const qNum = quiz.id !== undefined ? quiz.id : qIdx + 1;
-              const questionText = quiz.question || '';
-              const options = Array.isArray(quiz.options) ? quiz.options : [];
-              const correctAnswer = quiz.correct_answer || quiz.answer || quiz.correctAnswer || '';
-              const userAnswer = quizAnswers[qIdx];
-              const isAnswered = userAnswer !== undefined;
-              const userWasWrong = isAnswered && !isCorrectQuizAnswer(quiz, userAnswer);
+        <div
+          style={{ display: activeTab === 'quiz' ? 'flex' : 'none' }}
+          className="flex-col gap-4"
+        >
+          {/* Quiz Questions List */}
+          {quizzes.map((quiz, qIdx) => {
+            const qNum = quiz.id !== undefined ? quiz.id : qIdx + 1;
+            const questionText = quiz.question || '';
+            const options = Array.isArray(quiz.options) ? quiz.options : [];
+            const correctAnswer = quiz.correct_answer || quiz.answer || quiz.correctAnswer || '';
+            const userAnswer = quizAnswers[qIdx];
+            const isAnswered = userAnswer !== undefined;
+            const userWasWrong = isAnswered && !isCorrectQuizAnswer(quiz, userAnswer);
 
-              return (
-                <div
-                  key={qIdx}
-                  className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-col gap-3"
-                >
-                  {/* Question Header */}
-                  <div className="flex items-start gap-2.5">
-                    <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 tabular-nums mt-1 shrink-0 w-5 text-right">
-                      {qNum}.
-                    </span>
-                    <h3 className="text-[15px] sm:text-[15px] font-medium text-zinc-900 dark:text-zinc-100 leading-snug">
-                      {questionText}
-                    </h3>
-                  </div>
-
-                  {/* Options */}
-                  <div className="grid grid-cols-1 gap-1.5 pl-0 sm:pl-7">
-                    {options.map((option, optIdx) => {
-                      const isSelected = userAnswer === option;
-                      const isCorrect = isCorrectQuizAnswer(quiz, option);
-                      const letter = OPTION_LETTERS[optIdx] || String(optIdx + 1);
-
-                      let optionClass = "border-zinc-200/90 dark:border-white/[0.08] bg-transparent text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/15 hover:bg-zinc-50 dark:hover:bg-white/[0.03]";
-                      let badgeClass = "text-zinc-400 dark:text-zinc-500";
-                      let optionStyle = undefined;
-                      let badgeStyle = undefined;
-
-                      if (isAnswered) {
-                        if (isSelected) {
-                          // Selected option uses scheme/brand color
-                          optionClass = "text-zinc-900 dark:text-white font-medium";
-                          badgeClass = "font-semibold";
-                          optionStyle = {
-                            borderColor: 'color-mix(in srgb, var(--brand-color, #f97316) 45%, transparent)',
-                            backgroundColor: 'color-mix(in srgb, var(--brand-color, #f97316) 12%, transparent)',
-                          };
-                          badgeStyle = { color: 'var(--brand-color, #f97316)' };
-                        } else if (userWasWrong && isCorrect) {
-                          // Reveal correct answer lightly when user picked wrong
-                          optionClass = "text-zinc-700 dark:text-zinc-300";
-                          badgeClass = "";
-                          optionStyle = {
-                            borderColor: 'color-mix(in srgb, var(--brand-color, #f97316) 25%, transparent)',
-                            backgroundColor: 'color-mix(in srgb, var(--brand-color, #f97316) 5%, transparent)',
-                          };
-                          badgeStyle = {
-                            color: 'color-mix(in srgb, var(--brand-color, #f97316) 80%, transparent)',
-                          };
-                        } else {
-                          optionClass = "border-transparent text-zinc-400/50 dark:text-zinc-500/40 bg-transparent";
-                          badgeClass = "text-zinc-300 dark:text-zinc-600";
-                        }
-                      }
-
-                      return (
-                        <button
-                          key={optIdx}
-                          type="button"
-                          disabled={isAnswered}
-                          onClick={() => handleSelectOption(qIdx, option)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left text-sm transition-colors duration-150 cursor-pointer disabled:cursor-default ${optionClass}`}
-                          style={optionStyle}
-                        >
-                          <span
-                            className={`w-5 text-[11px] font-medium shrink-0 tabular-nums ${badgeClass}`}
-                            style={badgeStyle}
-                          >
-                            {letter}
-                          </span>
-                          <span className="flex-1 leading-snug select-text">{option}</span>
-                          {isAnswered && isCorrect && (
-                            <Check
-                              size={14}
-                              strokeWidth={2.5}
-                              className="shrink-0"
-                              style={{ color: 'var(--brand-color, #f97316)' }}
-                              aria-label="Correct"
-                            />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+            return (
+              <div
+                key={qIdx}
+                className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-col gap-3"
+              >
+                {/* Question Header */}
+                <div className="flex items-start gap-2.5">
+                  <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 tabular-nums mt-1 shrink-0 w-5 text-right">
+                    {qNum}.
+                  </span>
+                  <h3 className="text-[15px] sm:text-[15px] font-medium text-zinc-900 dark:text-zinc-100 leading-snug">
+                    {questionText}
+                  </h3>
                 </div>
-              );
-            })}
 
-            {quizzes.length === 0 && (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-xs flex flex-col items-center gap-3">
-                <p className="text-base font-medium text-gray-700 dark:text-gray-300">
-                  এই এপিসোডে কোনো কুইজ যুক্ত করা হয়নি
-                </p>
-                {parsedCsv.rows.length > 0 && (
-                  <button
-                    onClick={() => setActiveTab('vocabulary')}
-                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-xs cursor-pointer"
-                    style={{ backgroundColor: 'var(--brand-color, #f97316)' }}
-                  >
-                    Vocabulary দেখুন
-                  </button>
-                )}
+                {/* Options */}
+                <div className="grid grid-cols-1 gap-1.5 pl-0 sm:pl-7">
+                  {options.map((option, optIdx) => {
+                    const isSelected = userAnswer === option;
+                    const isCorrect = isCorrectQuizAnswer(quiz, option);
+                    const letter = OPTION_LETTERS[optIdx] || String(optIdx + 1);
+
+                    let optionClass = "border-zinc-200/90 dark:border-white/[0.08] bg-transparent text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/15 hover:bg-zinc-50 dark:hover:bg-white/[0.03]";
+                    let badgeClass = "text-zinc-400 dark:text-zinc-500";
+                    let optionStyle = undefined;
+                    let badgeStyle = undefined;
+
+                    if (isAnswered) {
+                      if (isSelected) {
+                        // Selected option uses scheme/brand color
+                        optionClass = "text-zinc-900 dark:text-white font-medium";
+                        badgeClass = "font-semibold";
+                        optionStyle = {
+                          borderColor: 'color-mix(in srgb, var(--brand-color, #f97316) 45%, transparent)',
+                          backgroundColor: 'color-mix(in srgb, var(--brand-color, #f97316) 12%, transparent)',
+                        };
+                        badgeStyle = { color: 'var(--brand-color, #f97316)' };
+                      } else if (userWasWrong && isCorrect) {
+                        // Reveal correct answer lightly when user picked wrong
+                        optionClass = "text-zinc-700 dark:text-zinc-300";
+                        badgeClass = "";
+                        optionStyle = {
+                          borderColor: 'color-mix(in srgb, var(--brand-color, #f97316) 25%, transparent)',
+                          backgroundColor: 'color-mix(in srgb, var(--brand-color, #f97316) 5%, transparent)',
+                        };
+                        badgeStyle = {
+                          color: 'color-mix(in srgb, var(--brand-color, #f97316) 80%, transparent)',
+                        };
+                      } else {
+                        optionClass = "border-transparent text-zinc-400/50 dark:text-zinc-500/40 bg-transparent";
+                        badgeClass = "text-zinc-300 dark:text-zinc-600";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        type="button"
+                        disabled={isAnswered}
+                        onClick={() => handleSelectOption(qIdx, option)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left text-sm transition-colors duration-150 cursor-pointer disabled:cursor-default ${optionClass}`}
+                        style={optionStyle}
+                      >
+                        <span
+                          className={`w-5 text-[11px] font-medium shrink-0 tabular-nums ${badgeClass}`}
+                          style={badgeStyle}
+                        >
+                          {letter}
+                        </span>
+                        <span className="flex-1 leading-snug select-text">{option}</span>
+                        {isAnswered && isCorrect && (
+                          <Check
+                            size={14}
+                            strokeWidth={2.5}
+                            className="shrink-0"
+                            style={{ color: 'var(--brand-color, #f97316)' }}
+                            aria-label="Correct"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
-          </motion.div>
-        )}
+            );
+          })}
+
+          {quizzes.length === 0 && (
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-xs flex flex-col items-center gap-3">
+              <p className="text-base font-medium text-gray-700 dark:text-gray-300">
+                এই এপিসোডে কোনো কুইজ যুক্ত করা হয়নি
+              </p>
+              {parsedCsv.rows.length > 0 && (
+                <button
+                  onClick={() => handleTabChange('vocabulary')}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-xs cursor-pointer"
+                  style={{ backgroundColor: 'var(--brand-color, #f97316)' }}
+                >
+                  Vocabulary দেখুন
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* VIEW 2: VOCABULARY */}
-        {activeTab === 'vocabulary' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-4"
-          >
-            {parsedCsv.rows.map((row, rowIndex) => (
-              <div
-                key={rowIndex}
-                className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-col gap-2"
-              >
-                {/* Content Rows */}
-                <div className="flex flex-col gap-1.5">
-                  {(() => {
-                    const cells = (parsedCsv.orderedColIndices || [])
-                      .map((cellIndex) => ({ cellIndex, value: row[cellIndex] || '' }))
-                      .filter((c) => c.value);
-                    return cells.map(({ cellIndex, value }, lineIdx) => {
-                      const copyKey = `${rowIndex}-${cellIndex}`;
-                      const isCopied = copiedStates[copyKey];
-                      const meta = getColMeta(cellIndex);
+        <div
+          style={{ display: activeTab === 'vocabulary' ? 'flex' : 'none' }}
+          className="flex-col gap-4"
+        >
+          {parsedCsv.rows.map((row, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] p-4 sm:p-5 flex flex-col gap-2"
+            >
+              {/* Content Rows */}
+              <div className="flex flex-col">
+                {(() => {
+                  const cells = (parsedCsv.orderedColIndices || [])
+                    .map((cellIndex) => ({ cellIndex, value: row[cellIndex] || '' }))
+                    .filter((c) => c.value);
+                  return cells.map(({ cellIndex, value }, lineIdx) => {
+                    const copyKey = `${rowIndex}-${cellIndex}`;
+                    const isCopied = copiedStates[copyKey];
+                    const meta = getColMeta(cellIndex);
 
-                      return (
-                        <div
-                          key={cellIndex}
-                          className="flex items-start justify-between gap-2.5 group"
-                        >
-                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                            {lineIdx === 0 ? (
-                              <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 tabular-nums mt-1 shrink-0 w-5 text-right">
-                                {rowIndex + 1}.
-                              </span>
-                            ) : (
-                              <span className="w-5 shrink-0" aria-hidden="true" />
-                            )}
-                            <span className={`flex-1 min-w-0 break-words whitespace-pre-wrap select-text leading-snug ${meta.textClass}`}>
-                              {value}
+                    return (
+                      <div
+                        key={cellIndex}
+                        className={`flex items-start justify-between gap-2.5 group py-2.5 first:pt-0 last:pb-0 ${
+                          lineIdx > 0 ? 'border-t border-zinc-200/60 dark:border-white/[0.06]' : ''
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                          {lineIdx === 0 ? (
+                            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 tabular-nums mt-1 shrink-0 w-5 text-right">
+                              {rowIndex + 1}.
                             </span>
-                          </div>
-
-                          <button
-                            onClick={() => handleCopy(value, copyKey)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer opacity-60 group-hover:opacity-100"
-                            title="Copy to clipboard"
-                          >
-                            {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                          </button>
+                          ) : (
+                            <span className="w-5 shrink-0" aria-hidden="true" />
+                          )}
+                          <span className={`flex-1 min-w-0 break-words whitespace-pre-wrap select-text leading-snug ${meta.textClass}`}>
+                            {value}
+                          </span>
                         </div>
-                      );
-                    });
-                  })()}
+
+                        <button
+                          onClick={() => handleCopy(value, copyKey)}
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors shrink-0 cursor-pointer opacity-60 group-hover:opacity-100"
+                          title="Copy to clipboard"
+                        >
+                          {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    );
+                  });
+                })()}
                 </div>
               </div>
             ))}
@@ -678,7 +722,7 @@ const PreviewPage = () => {
                 </p>
                 {quizzes.length > 0 && (
                   <button
-                    onClick={() => setActiveTab('quiz')}
+                    onClick={() => handleTabChange('quiz')}
                     className="px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-xs cursor-pointer"
                     style={{ backgroundColor: 'var(--brand-color, #f97316)' }}
                   >
@@ -687,8 +731,7 @@ const PreviewPage = () => {
                 )}
               </div>
             )}
-          </motion.div>
-        )}
+        </div>
       </div>
     </div>
   );
