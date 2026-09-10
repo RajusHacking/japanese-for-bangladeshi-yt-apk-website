@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SlidersHorizontal, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import AppearanceDrawer from './AppearanceDrawer';
 import J4BLogo from '../common/J4BLogo';
 
@@ -26,10 +26,14 @@ const TopBar = () => {
           <SlidersHorizontal className="w-5 h-5" />
         </button>
 
-        {/* Center - Main Brand Logo (No click action) */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center p-1.5 select-none">
+        {/* Center - Main Brand Logo (Link to Home) */}
+        <Link
+          to="/"
+          className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center p-1.5 select-none cursor-pointer transition-transform duration-200 active:scale-95 z-10"
+          aria-label="Go to Home"
+        >
           <J4BLogo className="w-9 h-9 sm:w-10 sm:h-10 text-brand transition-colors duration-300 pointer-events-none" />
-        </div>
+        </Link>
 
         {/* Right Button - Theme Switch */}
         <button
